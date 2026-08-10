@@ -35,6 +35,329 @@ export interface ISourceAdapter {
  * 1. DPSA Public Vacancies Adapter (Tier 1 Government)
  * Genuine live acquisition from official DPSA Public Service Vacancy Circulars (PSVC)
  */
+export interface DpsaParseMetrics {
+  totalParsed: number;
+  validCount: number;
+  rejectedCount: number;
+  needsReviewCount: number;
+  duplicateCount: number;
+  missingTitleCount: number;
+  missingDeptCount: number;
+  missingRefNoCount: number;
+  missingSalaryCount: number;
+  missingLocationCount: number;
+  missingClosingDateCount: number;
+}
+
+export function parseDpsaText(
+  text: string,
+  pdfUrl: string,
+  circularInfo: { num: number; year: number } = { num: 0, year: 2026 }
+): {
+  opportunities: Opportunity[];
+  metrics: DpsaParseMetrics;
+  rawBlocksDetected: number;
+} {
+  const today = new Date().toISOString().split('T')[0];
+  const items: Opportunity[] = [];
+  const metrics: DpsaParseMetrics = {
+    totalParsed: 0,
+    validCount: 0,
+    rejectedCount: 0,
+    needsReviewCount: 0,
+    duplicateCount: 0,
+    missingTitleCount: 0,
+    missingDeptCount: 0,
+    missingRefNoCount: 0,
+    missingSalaryCount: 0,
+    missingLocationCount: 0,
+    missingClosingDateCount: 0,
+  };
+
+  if (!text || text.trim().length === 0) {
+    return { opportunities: items, metrics, rawBlocksDetected: 0 };
+  }
+
+  // 1. Department Tracking & Inheritance Reset across PDF text
+  const deptRegex = /(?:DEPARTMENT OF [^\n\r]+|PROVINCIAL ADMINISTRATION:[^\n\r]+|GAUTENG DEPARTMENT OF [^\n\r]+|FREE STATE DEPARTMENT OF [^\n\r]+|KWAZULU-NATAL DEPARTMENT OF [^\n\r]+|WESTERN CAPE DEPARTMENT OF [^\n\r]+|EASTERN CAPE DEPARTMENT OF [^\n\r]+|LIMPOPO DEPARTMENT OF [^\n\r]+|MPUMALANGA DEPARTMENT OF [^\n\r]+|NORTH WEST DEPARTMENT OF [^\n\r]+|NORTHERN CAPE DEPARTMENT OF [^\n\r]+)/gi;
+  const deptMatches = [...text.matchAll(deptRegex)];
+  const deptIndexList = deptMatches.map(m => ({
+    index: m.index!,
+    name: m[0].trim().replace(/\s+/g, ' '),
+  }));
+
+  let topDefaultDept = 'Department of Public Service and Administration';
+  if (deptIndexList.length > 0) {
+    topDefaultDept = deptIndexList[0].name;
+  }
+
+  // 2. Circular-wide Closing Date
+  let rawClosingDate = '';
+  const closingMatch = text.match(/CLOSING DATE\s*:\s*([^\n\r]+)/i);
+  if (closingMatch) {
+    rawClosingDate = closingMatch[1].trim().replace(/\s+/g, ' ');
+  }
+
+  // 3. Advert Segmentation: Find POST XX/YY or POST N matches
+  const postRegex = /POST\s+(\d+(?:\/\d+)?)\s*:\s*/gi;
+  const postMatches = [...text.matchAll(postRegex)];
+  const rawBlocksDetected = postMatches.length;
+
+  const seenKeys = new Set<string>();
+
+  for (let j = 0; j < postMatches.length; j++) {
+    const match = postMatches[j];
+    const postNumber = match[1];
+    const startIndex = match.index!;
+    const endIndex = j < postMatches.length - 1 ? postMatches[j + 1].index! : text.length;
+    const postChunk = text.slice(startIndex, endIndex);
+
+    metrics.totalParsed++;
+
+    // Assign Department to nearest preceding department heading
+    let department = topDefaultDept;
+    for (let d = deptIndexList.length - 1; d >= 0; d--) {
+      if (deptIndexList[d].index <= startIndex) {
+        department = deptIndexList[d].name;
+        break;
+      }
+    }
+
+    if (!department || department.trim().length === 0) {
+      metrics.missingDeptCount++;
+    }
+
+    // 4. Extract Title & Handle Wrapped Titles
+    // Title starts right after "POST XX/YY :" and ends at the first section header marker
+    const titleStartOffset = match[0].length;
+    const afterPostText = postChunk.slice(titleStartOffset);
+
+    // Stop title at next structural label
+    const titleLabelStopRegex = /(?=\n\s*(?:REF NO|SALARY|CENTRE|REQUIREMENTS|DUTIES|ENQUIRIES|APPLICATIONS|CLOSING DATE)|$)/i;
+    const titleStopMatch = afterPostText.match(titleLabelStopRegex);
+    let titleBlock = titleStopMatch ? afterPostText.slice(0, titleStopMatch.index) : afterPostText.slice(0, 300);
+
+    // Clean title block: replace newlines/multiple spaces with single space, strip REF NO if present
+    let title = titleBlock
+      .replace(/REF NO\s*:.*$/i, '')
+      .replace(/SALARY\s*:.*$/i, '')
+      .replace(/CENTRE\s*:.*$/i, '')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .replace(/^[:\s]+|[:\s]+$/g, '');
+
+    // Rejection rule on title:
+    const isMalformedTitle =
+      !title ||
+      title.length < 3 ||
+      title.length > 250 ||
+      /REQUIREMENTS\s*:/i.test(title) ||
+      /DUTIES\s*:/i.test(title) ||
+      /SALARY\s*:/i.test(title) ||
+      /ENQUIRIES\s*:/i.test(title);
+
+    if (isMalformedTitle) {
+      metrics.missingTitleCount++;
+      metrics.rejectedCount++;
+      continue; // REJECT malformed title record
+    }
+
+    // 5. Reference Number Extraction (strictly within postChunk)
+    let refNo = '';
+    const refMatch = postChunk.match(/REF NO\s*:\s*([^\n\r]+)/i);
+    if (refMatch) {
+      refNo = refMatch[1].trim().replace(/\s+/g, ' ');
+    } else {
+      metrics.missingRefNoCount++;
+    }
+
+    // 6. Salary Extraction (strictly within postChunk)
+    let salaryText = '';
+    const salaryMatch = postChunk.match(/SALARY\s*:\s*([^\n\r]+)/i);
+    if (salaryMatch) {
+      salaryText = salaryMatch[1].trim().replace(/\s+/g, ' ');
+    } else {
+      metrics.missingSalaryCount++;
+    }
+
+    let minAmount: number | undefined;
+    let maxAmount: number | undefined;
+    if (salaryText) {
+      const salaryNums = salaryText.match(/R\s*([\d\s]+)/g);
+      if (salaryNums && salaryNums.length >= 1) {
+        const parsed = salaryNums
+          .map(s => parseInt(s.replace(/[^\d]/g, ''), 10))
+          .filter(n => !isNaN(n) && n > 1000);
+        if (parsed.length >= 1) minAmount = parsed[0];
+        if (parsed.length >= 2) maxAmount = parsed[1];
+      }
+    }
+
+    let period: 'Annual' | 'Monthly' | 'Unknown' = 'Unknown';
+    if (salaryText) {
+      if (/annum|year/i.test(salaryText)) period = 'Annual';
+      else if (/month/i.test(salaryText)) period = 'Monthly';
+    }
+
+    // 7. Centre / Location Extraction (strictly within postChunk)
+    let centreText = '';
+    const centreMatch = postChunk.match(/CENTRE\s*:\s*([^\n\r]+)/i);
+    if (centreMatch) {
+      centreText = centreMatch[1].trim().replace(/\s+/g, ' ');
+    } else {
+      metrics.missingLocationCount++;
+    }
+
+    let city = 'Unknown';
+    if (/Pretoria/i.test(centreText)) city = 'Pretoria';
+    else if (/Johannesburg/i.test(centreText)) city = 'Johannesburg';
+    else if (/Cape Town/i.test(centreText)) city = 'Cape Town';
+    else if (/Durban/i.test(centreText)) city = 'Durban';
+    else if (/Bloemfontein/i.test(centreText)) city = 'Bloemfontein';
+    else if (/Polokwane/i.test(centreText)) city = 'Polokwane';
+    else if (/Nelspruit|Mbombela/i.test(centreText)) city = 'Mbombela';
+    else if (/Pietermaritzburg/i.test(centreText)) city = 'Pietermaritzburg';
+    else if (/Kimberley/i.test(centreText)) city = 'Kimberley';
+    else if (/Mahikeng|Mmabatho/i.test(centreText)) city = 'Mahikeng';
+    else if (/Bisho|Bhisho/i.test(centreText)) city = 'Bhisho';
+
+    let province = 'Unknown';
+    if (/Gauteng/i.test(centreText) || /Gauteng/i.test(department)) province = 'Gauteng';
+    else if (/Western Cape/i.test(centreText) || /Western Cape/i.test(department)) province = 'Western Cape';
+    else if (/KwaZulu-Natal|KZN/i.test(centreText) || /KwaZulu-Natal/i.test(department)) province = 'KwaZulu-Natal';
+    else if (/Eastern Cape/i.test(centreText) || /Eastern Cape/i.test(department)) province = 'Eastern Cape';
+    else if (/Limpopo/i.test(centreText) || /Limpopo/i.test(department)) province = 'Limpopo';
+    else if (/Mpumalanga/i.test(centreText) || /Mpumalanga/i.test(department)) province = 'Mpumalanga';
+    else if (/Free State/i.test(centreText) || /Free State/i.test(department)) province = 'Free State';
+    else if (/North West/i.test(centreText) || /North West/i.test(department)) province = 'North West';
+    else if (/Northern Cape/i.test(centreText) || /Northern Cape/i.test(department)) province = 'Northern Cape';
+
+    // 8. Requirements & Duties Section Boundaries
+    let reqs: string[] = [];
+    const reqMatch = postChunk.match(/REQUIREMENTS\s*:\s*([\s\S]*?)(?=\n\s*(?:DUTIES|ENQUIRIES|APPLICATIONS|NOTE|CLOSING DATE|POST\s+\d+)|$)/i);
+    if (reqMatch) {
+      reqs = reqMatch[1]
+        .trim()
+        .split(/\.\s+|\n+/)
+        .map(s => s.trim().replace(/\s+/g, ' '))
+        .filter(s => s.length > 5);
+    }
+
+    let duties: string[] = [];
+    const dutyMatch = postChunk.match(/DUTIES\s*:\s*([\s\S]*?)(?=\n\s*(?:ENQUIRIES|APPLICATIONS|NOTE|REQUIREMENTS|CLOSING DATE|POST\s+\d+)|$)/i);
+    if (dutyMatch) {
+      duties = dutyMatch[1]
+        .trim()
+        .split(/\.\s+|\n+/)
+        .map(s => s.trim().replace(/\s+/g, ' '))
+        .filter(s => s.length > 5);
+    }
+
+    // 9. Enquiries & Applications
+    let enquiries = '';
+    const enqMatch = postChunk.match(/ENQUIRIES\s*:\s*([^\n\r]+)/i);
+    if (enqMatch) enquiries = enqMatch[1].trim().replace(/\s+/g, ' ');
+
+    let applications = '';
+    const appMatch = postChunk.match(/APPLICATIONS\s*:\s*([^\n\r]+)/i);
+    if (appMatch) applications = appMatch[1].trim().replace(/\s+/g, ' ');
+
+    // 10. Post-specific or Circular Closing Date
+    let postClosingDate = rawClosingDate;
+    const postClosingMatch = postChunk.match(/CLOSING DATE\s*:\s*([^\n\r]+)/i);
+    if (postClosingMatch) {
+      postClosingDate = postClosingMatch[1].trim().replace(/\s+/g, ' ');
+    }
+
+    if (!postClosingDate) {
+      metrics.missingClosingDateCount++;
+    }
+
+    let appUrl = pdfUrl;
+    const urlInApp = applications.match(/(https?:\/\/[^\s]+)/i);
+    if (urlInApp) appUrl = urlInApp[1];
+
+    // Duplicate detection key
+    const dedupeKey = refNo
+      ? `${department}::${refNo}`.toLowerCase()
+      : `${department}::${title}::${centreText}`.toLowerCase();
+
+    if (seenKeys.has(dedupeKey)) {
+      metrics.duplicateCount++;
+    }
+    seenKeys.add(dedupeKey);
+
+    const oppId = `dpsa_${circularInfo.year}_${circularInfo.num}_post_${postNumber.replace('/', '_')}`;
+
+    const prov: JobSourceProvenance = {
+      sourceId: 'dpsa_gov_za',
+      sourceName: 'DPSA Public Service Vacancies',
+      sourceTier: 1,
+      sourceType: 'GOVERNMENT',
+      originalListingId: refNo || postNumber,
+      originalUrl: pdfUrl,
+      employerName: department,
+      publicationDate: today,
+      lastVerifiedDate: today,
+      lastSeenAt: today,
+      expiresAt: postClosingDate || undefined,
+      sourceStatus: 'LIVE_EXTERNAL',
+      verificationStatus: 'UNVERIFIED',
+      destinationStatus: 'LISTING_ONLY',
+      freshnessStatus: 'NEW',
+      applicationDestination: appUrl,
+      isRealVerified: false,
+      isFixture: false,
+      isLive: true,
+      attributionRequired: false,
+    };
+
+    const item: Opportunity = {
+      id: oppId,
+      title,
+      employer: department,
+      location: {
+        city,
+        province,
+        regionType: 'LOCAL',
+        country: 'South Africa',
+        rawLocationText: centreText || undefined,
+      },
+      jobCategory: 'Administration & Clerical',
+      employmentType: 'Unknown',
+      experienceLevel: 'Unknown',
+      qualificationRequirement: reqs.length > 0 ? reqs[0] : 'NOT_SPECIFIED',
+      salary: salaryText
+        ? {
+            formatted: salaryText,
+            period,
+            minAmount,
+            maxAmount,
+            currency: 'ZAR',
+          }
+        : undefined,
+      summary: `${title} at ${department}${centreText ? ' (' + centreText + ')' : ''}`,
+      fullDescription: `Department: ${department}\nCentre: ${centreText || 'Not specified'}\nRef No: ${
+        refNo || 'Not specified'
+      }\n\nRequirements:\n${reqs.join('\n')}\n\nDuties:\n${duties.join('\n')}\n\nEnquiries: ${enquiries}`,
+      requirements: reqs,
+      responsibilities: duties,
+      skillsRequired: [],
+      closingDate: postClosingDate || undefined,
+      postedAt: today,
+      updatedAt: today,
+      sourceProvenance: prov,
+      isFixture: false,
+      isLive: true,
+    };
+
+    metrics.validCount++;
+    items.push(item);
+  }
+
+  return { opportunities: items, metrics, rawBlocksDetected };
+}
+
 export class DpsaPublicVacanciesAdapter implements ISourceAdapter {
   sourceId = 'dpsa_gov_za';
   sourceName = 'DPSA Public Service Vacancies';
@@ -46,7 +369,6 @@ export class DpsaPublicVacanciesAdapter implements ISourceAdapter {
   }
 
   async fetchOpportunities(params?: SourceQueryParams): Promise<Opportunity[]> {
-    const today = new Date().toISOString().split('T')[0];
     const registry = SourceRegistry.getInstance();
 
     try {
@@ -122,191 +444,13 @@ export class DpsaPublicVacanciesAdapter implements ISourceAdapter {
 
               const buffer = await pdfRes.arrayBuffer();
               const parsedPdf = await pdfParse(Buffer.from(buffer));
-              const text = parsedPdf.text;
 
-              let department = 'Department of Public Service and Administration';
-              const deptMatch = text.match(/(DEPARTMENT OF [^\n\r]+|PROVINCIAL ADMINISTRATION:[^\n\r]+|GAUTENG DEPARTMENT OF [^\n\r]+)/i);
-              if (deptMatch) {
-                department = deptMatch[1].trim().replace(/\s+/g, ' ');
-              }
+              const { opportunities } = parseDpsaText(parsedPdf.text, pdfUrl, {
+                num: latestCirc.num,
+                year: latestCirc.year,
+              });
 
-              let rawClosingDate = '';
-              const closingMatch = text.match(/CLOSING DATE\s*:\s*([^\n\r]+)/i);
-              if (closingMatch) {
-                rawClosingDate = closingMatch[1].trim().replace(/\s+/g, ' ');
-              }
-
-              const postRegex = /POST\s+(\d+\/\d+)\s*:\s*([^\n\r]+)/gi;
-              const postMatches = [...text.matchAll(postRegex)];
-              const itemsInPdf: Opportunity[] = [];
-
-              for (let j = 0; j < postMatches.length; j++) {
-                const match = postMatches[j];
-                const postNumber = match[1];
-                let rawTitleLine = match[2].trim().replace(/\s+/g, ' ');
-                const startIndex = match.index!;
-                const endIndex = j < postMatches.length - 1 ? postMatches[j + 1].index! : text.length;
-                const postChunk = text.slice(startIndex, endIndex);
-
-                let refNo = '';
-                const refMatch = postChunk.match(/REF NO\s*:\s*([^\n\r]+)/i);
-                if (refMatch) {
-                  refNo = refMatch[1].trim().replace(/\s+/g, ' ');
-                }
-
-                let title = rawTitleLine.replace(/REF NO\s*:.*$/i, '').trim();
-
-                let salaryText = '';
-                const salaryMatch = postChunk.match(/SALARY\s*:\s*([^\n\r]+)/i);
-                if (salaryMatch) {
-                  salaryText = salaryMatch[1].trim().replace(/\s+/g, ' ');
-                }
-
-                let centreText = '';
-                const centreMatch = postChunk.match(/CENTRE\s*:\s*([^\n\r]+)/i);
-                if (centreMatch) {
-                  centreText = centreMatch[1].trim().replace(/\s+/g, ' ');
-                }
-
-                let reqs: string[] = [];
-                const reqMatch = postChunk.match(/REQUIREMENTS\s*:\s*([\s\S]*?)(?=DUTIES|ENQUIRIES|APPLICATIONS|NOTE|POST\s+\d+\/\d+|$)/i);
-                if (reqMatch) {
-                  reqs = reqMatch[1]
-                    .trim()
-                    .split(/\.\s+|\n+/)
-                    .map(s => s.trim().replace(/\s+/g, ' '))
-                    .filter(s => s.length > 5);
-                }
-
-                let duties: string[] = [];
-                const dutyMatch = postChunk.match(/DUTIES\s*:\s*([\s\S]*?)(?=ENQUIRIES|APPLICATIONS|NOTE|REQUIREMENTS|POST\s+\d+\/\d+|$)/i);
-                if (dutyMatch) {
-                  duties = dutyMatch[1]
-                    .trim()
-                    .split(/\.\s+|\n+/)
-                    .map(s => s.trim().replace(/\s+/g, ' '))
-                    .filter(s => s.length > 5);
-                }
-
-                let enquiries = '';
-                const enqMatch = postChunk.match(/ENQUIRIES\s*:\s*([^\n\r]+)/i);
-                if (enqMatch) enquiries = enqMatch[1].trim().replace(/\s+/g, ' ');
-
-                let applications = '';
-                const appMatch = postChunk.match(/APPLICATIONS\s*:\s*([^\n\r]+)/i);
-                if (appMatch) applications = appMatch[1].trim().replace(/\s+/g, ' ');
-
-                const oppId = `dpsa_${latestCirc.year}_${latestCirc.num}_post_${postNumber.replace('/', '_')}`;
-
-                let city = 'Unknown';
-                if (/Pretoria/i.test(centreText)) city = 'Pretoria';
-                else if (/Johannesburg/i.test(centreText)) city = 'Johannesburg';
-                else if (/Cape Town/i.test(centreText)) city = 'Cape Town';
-                else if (/Durban/i.test(centreText)) city = 'Durban';
-                else if (/Bloemfontein/i.test(centreText)) city = 'Bloemfontein';
-                else if (/Polokwane/i.test(centreText)) city = 'Polokwane';
-                else if (/Nelspruit|Mbombela/i.test(centreText)) city = 'Mbombela';
-                else if (/Pietermaritzburg/i.test(centreText)) city = 'Pietermaritzburg';
-                else if (/Kimberley/i.test(centreText)) city = 'Kimberley';
-                else if (/Mahikeng|Mmabatho/i.test(centreText)) city = 'Mahikeng';
-                else if (/Bisho|Bhisho/i.test(centreText)) city = 'Bhisho';
-
-                let province = 'Unknown';
-                if (/Gauteng/i.test(centreText) || /Gauteng/i.test(department)) province = 'Gauteng';
-                else if (/Western Cape/i.test(centreText) || /Western Cape/i.test(department)) province = 'Western Cape';
-                else if (/KwaZulu-Natal|KZN/i.test(centreText) || /KwaZulu-Natal/i.test(department)) province = 'KwaZulu-Natal';
-                else if (/Eastern Cape/i.test(centreText) || /Eastern Cape/i.test(department)) province = 'Eastern Cape';
-                else if (/Limpopo/i.test(centreText) || /Limpopo/i.test(department)) province = 'Limpopo';
-                else if (/Mpumalanga/i.test(centreText) || /Mpumalanga/i.test(department)) province = 'Mpumalanga';
-                else if (/Free State/i.test(centreText) || /Free State/i.test(department)) province = 'Free State';
-                else if (/North West/i.test(centreText) || /North West/i.test(department)) province = 'North West';
-                else if (/Northern Cape/i.test(centreText) || /Northern Cape/i.test(department)) province = 'Northern Cape';
-
-                let minAmount: number | undefined;
-                let maxAmount: number | undefined;
-                const salaryNums = salaryText.match(/R\s*([\d\s]+)/g);
-                if (salaryNums && salaryNums.length >= 1) {
-                  const parsed = salaryNums
-                    .map(s => parseInt(s.replace(/[^\d]/g, ''), 10))
-                    .filter(n => !isNaN(n) && n > 1000);
-                  if (parsed.length >= 1) minAmount = parsed[0];
-                  if (parsed.length >= 2) maxAmount = parsed[1];
-                }
-
-                let period: 'Annual' | 'Monthly' | 'Unknown' = 'Unknown';
-                if (/annum|year/i.test(salaryText)) period = 'Annual';
-                else if (/month/i.test(salaryText)) period = 'Monthly';
-
-                let appUrl = pdfUrl;
-                const urlInApp = applications.match(/(https?:\/\/[^\s]+)/i);
-                if (urlInApp) appUrl = urlInApp[1];
-
-                const prov: JobSourceProvenance = {
-                  sourceId: this.sourceId,
-                  sourceName: this.sourceName,
-                  sourceTier: 1,
-                  sourceType: 'GOVERNMENT',
-                  originalListingId: refNo || postNumber,
-                  originalUrl: pdfUrl,
-                  employerName: department,
-                  publicationDate: today,
-                  lastVerifiedDate: today,
-                  lastSeenAt: today,
-                  expiresAt: rawClosingDate || undefined,
-                  sourceStatus: 'LIVE_EXTERNAL',
-                  verificationStatus: 'UNVERIFIED',
-                  destinationStatus: 'LISTING_ONLY',
-                  freshnessStatus: 'NEW',
-                  applicationDestination: appUrl,
-                  isRealVerified: false,
-                  isFixture: false,
-                  isLive: true,
-                  attributionRequired: false,
-                };
-
-                const item: Opportunity = {
-                  id: oppId,
-                  title,
-                  employer: department,
-                  location: {
-                    city,
-                    province,
-                    regionType: 'LOCAL',
-                    country: 'South Africa',
-                    rawLocationText: centreText || undefined,
-                  },
-                  jobCategory: 'Administration & Clerical',
-                  employmentType: 'Unknown',
-                  experienceLevel: 'Unknown',
-                  qualificationRequirement: reqs.length > 0 ? reqs[0] : 'NOT_SPECIFIED',
-                  salary: salaryText
-                    ? {
-                        formatted: salaryText,
-                        period,
-                        minAmount,
-                        maxAmount,
-                        currency: 'ZAR',
-                      }
-                    : undefined,
-                  summary: `${title} at ${department}${centreText ? ' (' + centreText + ')' : ''}`,
-                  fullDescription: `Department: ${department}\nCentre: ${centreText}\nRef No: ${refNo}\n\nRequirements:\n${reqs.join(
-                    '\n'
-                  )}\n\nDuties:\n${duties.join('\n')}\n\nEnquiries: ${enquiries}`,
-                  requirements: reqs,
-                  responsibilities: duties,
-                  skillsRequired: [],
-                  closingDate: rawClosingDate || undefined,
-                  postedAt: today,
-                  updatedAt: today,
-                  sourceProvenance: prov,
-                  isFixture: false,
-                  isLive: true,
-                };
-
-                itemsInPdf.push(item);
-              }
-
-              return itemsInPdf;
+              return opportunities;
             } catch (pdfErr) {
               return [];
             }
