@@ -90,7 +90,7 @@ export interface Opportunity {
     period: 'Hourly' | 'Monthly' | 'Annual' | 'Stipend' | 'Weekly' | 'Daily' | 'Unknown';
     minAmount?: number;
     maxAmount?: number;
-    currency: string;
+    currency?: string;
   };
   summary: string;
   fullDescription?: string;

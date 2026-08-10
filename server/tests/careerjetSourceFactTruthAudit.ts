@@ -205,7 +205,7 @@ export async function runCareerjetSourceFactTruthAudit(): Promise<{ passed: numb
   assert(oppsCurr[2]?.salary?.currency === 'GBP', 'TEST 32', 'GBP remains GBP');
   assert(oppsCurr[3]?.salary?.currency === 'EUR', 'TEST 33', 'EUR remains EUR');
   assert(oppsCurr[1]?.salary?.currency === 'USD', 'TEST 34', 'No FX conversion occurred');
-  assert(oppsCurr[4]?.salary?.currency === 'ZAR', 'TEST 35', 'Missing currency code defaults to market currency ZAR without FX conversion');
+  assert(oppsCurr[4]?.salary?.currency === undefined, 'TEST 35', 'Missing currency code yields undefined currency without default ZAR assumption');
 
   // 5. Salary Value Tests (36 - 41)
   currentMockResponse = {

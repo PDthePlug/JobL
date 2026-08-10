@@ -1187,15 +1187,23 @@ export class CareerjetAdapter implements ISourceAdapter {
 
         let city = 'Unknown';
         let province = 'Unknown';
+        let country = 'Unknown';
 
         if (rawLoc) {
           const parts = rawLoc.split(',').map(s => s.trim()).filter(Boolean);
           if (parts.length >= 2) {
             city = parts[0];
             province = parts[1];
-          } else if (parts.length === 1) {
-            city = parts[0];
+          } else {
+            // Single-part location: do NOT assume single token is city or province
+            city = 'Unknown';
             province = 'Unknown';
+          }
+
+          // Vacancy country: only set to 'South Africa' if explicitly established in source location
+          const lowerLoc = rawLoc.toLowerCase();
+          if (lowerLoc.includes('south africa') || lowerLoc.endsWith(', za') || lowerLoc === 'za') {
+            country = 'South Africa';
           }
         }
 
@@ -1245,17 +1253,17 @@ export class CareerjetAdapter implements ISourceAdapter {
 
           const currency = (item.salary_currency_code && typeof item.salary_currency_code === 'string' && item.salary_currency_code.trim())
             ? item.salary_currency_code.trim().toUpperCase()
-            : 'ZAR';
+            : undefined;
 
           let formatted = '';
           if (item.salary && typeof item.salary === 'string' && item.salary.trim()) {
             formatted = item.salary.trim();
           } else if (minNum !== undefined && maxNum !== undefined) {
-            formatted = `${currency} ${minNum} - ${maxNum}`;
+            formatted = currency ? `${currency} ${minNum} - ${maxNum}` : `${minNum} - ${maxNum}`;
           } else if (minNum !== undefined) {
-            formatted = `${currency} ${minNum}`;
+            formatted = currency ? `${currency} ${minNum}` : `${minNum}`;
           } else if (maxNum !== undefined) {
-            formatted = `${currency} ${maxNum}`;
+            formatted = currency ? `${currency} ${maxNum}` : `${maxNum}`;
           }
 
           salaryObj = {
@@ -1276,7 +1284,7 @@ export class CareerjetAdapter implements ISourceAdapter {
             city,
             province,
             regionType: 'UNKNOWN',
-            country: 'South Africa',
+            country,
             remoteStatus: 'UNKNOWN',
           },
           jobCategory: 'Unclassified',

@@ -91,16 +91,29 @@ export class OpportunityPipeline {
       }
     });
 
-    // 3. Normalization, Geographic Containment & Freshness checks
+    // 3. Normalization, Source Origin Eligibility, Geographic Containment & Freshness checks
     const normalized = rawList.filter((item) => {
-      // Exclude fixtures in production
-      if (isProduction && (item.isFixture || item.sourceProvenance.isFixture || item.sourceProvenance.sourceStatus === 'FIXTURE')) {
+      const sourceStatus = item.sourceProvenance.sourceStatus;
+      const isFixture = item.isFixture || item.sourceProvenance.isFixture;
+
+      // 1. Always block non-implemented, non-partner, or disabled sources
+      const blockedStatuses = ['NOT_IMPLEMENTED', 'PARTNERSHIP_REQUIRED', 'DISABLED'];
+      if (blockedStatuses.includes(sourceStatus)) {
         return false;
       }
 
-      // Exclude unverified live sources (fixtures have isRealVerified=false by design)
-      if (!item.isFixture && (item.sourceProvenance.verificationStatus === 'UNVERIFIED' || item.sourceProvenance.isRealVerified === false)) {
-        return false;
+      // 2. Fixture protections: block static fixtures in production or when not explicitly requested in dev mode
+      const fixtureStatuses = ['STATIC_FIXTURE', 'FIXTURE', 'FIXTURE_ONLY', 'DEVELOPMENT_ONLY'];
+      if (isFixture || fixtureStatuses.includes(sourceStatus)) {
+        if (isProduction || params?.includeFixtures !== true) {
+          return false;
+        }
+      } else {
+        // Live opportunities: must originate from genuine live source status and have live indicators
+        const liveStatuses = ['LIVE', 'LIVE_EXTERNAL', 'LICENSED', 'PARTNER'];
+        if (!item.isLive || !item.sourceProvenance.isLive || !liveStatuses.includes(sourceStatus)) {
+          return false;
+        }
       }
 
       // Check basic employer & title existence
@@ -120,13 +133,18 @@ export class OpportunityPipeline {
       }
 
       // Geographic containment: Enforce South Africa boundary
-      const country = (item.location.country || 'South Africa').trim().toLowerCase();
+      const country = (item.location.country || 'Unknown').trim().toLowerCase();
       const isSA = country === 'south africa' || country === 'za';
+      const isUnknownCountry = country === 'unknown';
       const isRemoteSA = item.location.regionType === 'REMOTE_SA' || item.location.remoteStatus === 'REMOTE_SA';
       const isSAEligible = item.location.geographicEligibility?.isSouthAfricaEligible ?? true;
+      const isSAMarket = item.sourceProvenance.sourceId === 'careerjet_sa' ||
+                         item.sourceProvenance.sourceId === 'adzuna_sa' ||
+                         item.sourceProvenance.sourceId === 'jooble_sa' ||
+                         Boolean(item.sourceProvenance.attributionConfig?.termsUrl?.includes('careerjet.co.za'));
 
-      // Reject non-South Africa jobs unless explicitly marked as SA-eligible remote
-      if (!isSA && !isRemoteSA && !isSAEligible) {
+      // Reject non-South Africa jobs unless explicitly marked as SA-eligible, or from a SA query market with Unknown country
+      if (!isSA && !isRemoteSA && !isSAEligible && !(isUnknownCountry && isSAMarket)) {
         return false;
       }
 
