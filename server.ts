@@ -42,6 +42,12 @@ app.get('/api/opportunities/search', async (req, res) => {
       experience: (experience as string) || 'All',
     });
 
+    const xForwardedFor = req.headers['x-forwarded-for'];
+    const userIp = typeof xForwardedFor === 'string'
+      ? xForwardedFor.split(',')[0].trim()
+      : (req.ip || (req.socket && req.socket.remoteAddress) || '');
+    const userAgent = (req.headers['user-agent'] as string) || '';
+
     const queryParams = {
       city: city as string,
       province: province as string,
@@ -49,6 +55,8 @@ app.get('/api/opportunities/search', async (req, res) => {
       experience: experience as string,
       keywords: keywords as string,
       page: page ? parseInt(page as string, 10) : 1,
+      userIp,
+      userAgent,
     };
 
     const allValidated = await pipeline.fetchAllValidatedOpportunities(queryParams);

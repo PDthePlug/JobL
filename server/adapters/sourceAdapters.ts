@@ -16,6 +16,8 @@ export interface SourceQueryParams {
   page?: number;
   limit?: number;
   includeFixtures?: boolean;
+  userIp?: string;
+  userAgent?: string;
 }
 
 export interface ISourceAdapter {
@@ -1082,11 +1084,173 @@ export class CareerjetAdapter implements ISourceAdapter {
   sourceType: SourceType = 'AUTHORISED_AGGREGATOR';
 
   async getStatus(): Promise<SourceAdapterStatus> {
-    return 'NOT_IMPLEMENTED';
+    return 'LIVE_EXTERNAL';
   }
 
   async fetchOpportunities(params?: SourceQueryParams): Promise<Opportunity[]> {
-    return [];
+    const registry = SourceRegistry.getInstance();
+
+    // CAREERJET_AFFILIATE_ID is retained only temporarily because previous JobL versions used the wrong environment variable name.
+    const apiKey = process.env.CAREERJET_API_KEY || process.env.CAREERJET_AFFILIATE_ID;
+    if (!apiKey) {
+      registry.recordRequest(this.sourceId, false, 0, 0, 0);
+      return [];
+    }
+
+    const userIp = params?.userIp?.trim();
+    const userAgent = params?.userAgent?.trim();
+    if (!userIp || !userAgent) {
+      registry.recordRequest(this.sourceId, false, 0, 0, 0);
+      return [];
+    }
+
+    try {
+      const url = new URL('https://search.api.careerjet.net/v4/query');
+      url.searchParams.append('locale_code', 'en_ZA');
+      url.searchParams.append('user_ip', userIp);
+      url.searchParams.append('user_agent', userAgent);
+
+      const keywords = params?.keywords || (params?.category && params.category !== 'All' && params.category !== 'All Categories' ? params.category : '');
+      if (keywords) {
+        url.searchParams.append('keywords', keywords);
+      }
+
+      const locParts = [params?.city, params?.province].filter(Boolean);
+      if (locParts.length > 0) {
+        url.searchParams.append('location', locParts.join(', '));
+      }
+
+      if (params?.page) {
+        url.searchParams.append('page', String(params.page));
+      }
+      if (params?.limit) {
+        url.searchParams.append('page_size', String(Math.min(Math.max(params.limit, 1), 99)));
+      }
+
+      const authHeader = `Basic ${Buffer.from(`${apiKey}:`).toString('base64')}`;
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: {
+          'Authorization': authHeader,
+          'User-Agent': userAgent,
+          'Accept': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        registry.recordRequest(this.sourceId, false, 0, 0, 0);
+        return [];
+      }
+
+      const data = await response.json();
+      if (!data) {
+        registry.recordRequest(this.sourceId, false, 0, 0, 0);
+        return [];
+      }
+
+      // Handle non-JOBS responses (e.g. LOCATION_UNKNOWN, LOCATION_AMBIGUOUS)
+      if (data.type !== 'JOBS' || !Array.isArray(data.jobs)) {
+        registry.recordRequest(this.sourceId, true, 0, 0, 0);
+        return [];
+      }
+
+      const today = new Date().toISOString().split('T')[0];
+      const opportunities: Opportunity[] = [];
+
+      for (let idx = 0; idx < data.jobs.length; idx++) {
+        const item = data.jobs[idx];
+        if (!item || !item.title || !item.title.trim() || !item.url) {
+          continue;
+        }
+
+        const urlHash = Buffer.from(item.url).toString('hex').slice(0, 16);
+        const id = `careerjet_${urlHash}`;
+        const rawLoc = item.locations || item.location || (params?.city ? (params.province ? `${params.city}, ${params.province}` : params.city) : 'South Africa');
+
+        let pubDate = today;
+        if (item.date) {
+          try {
+            const parsed = new Date(item.date);
+            if (!isNaN(parsed.getTime())) {
+              pubDate = parsed.toISOString().split('T')[0];
+            }
+          } catch {
+            pubDate = today;
+          }
+        }
+
+        const opp: Opportunity = {
+          id,
+          title: item.title.trim(),
+          employer: item.company && item.company.trim() ? item.company.trim() : 'Unspecified Employer',
+          location: {
+            city: rawLoc,
+            province: params?.province || 'South Africa',
+            regionType: 'NATIONAL',
+            country: 'South Africa',
+            remoteStatus: 'NONE',
+          },
+          jobCategory: params?.category || 'General',
+          employmentType: 'Full-time',
+          experienceLevel: 'Entry level',
+          qualificationRequirement: 'NOT_SPECIFIED',
+          salary: (item.salary || item.salary_min || item.salary_max) ? {
+            formatted: item.salary || `${item.salary_currency_code || 'ZAR'} ${item.salary_min || ''} - ${item.salary_max || ''}`.trim(),
+            period: (item.salary_type === 'year' || item.salary_type === 'annually') ? 'Annual' : (item.salary_type === 'month' || item.salary_type === 'monthly') ? 'Monthly' : (item.salary_type === 'hour' || item.salary_type === 'hourly') ? 'Hourly' : 'Monthly',
+            minAmount: item.salary_min ? Number(item.salary_min) : undefined,
+            maxAmount: item.salary_max ? Number(item.salary_max) : undefined,
+            currency: item.salary_currency_code === 'USD' ? 'USD' : 'ZAR',
+          } : undefined,
+          summary: item.description || '',
+          fullDescription: item.description || '',
+          requirements: [],
+          responsibilities: [],
+          skillsRequired: [],
+          closingDate: undefined,
+          postedAt: pubDate,
+          updatedAt: today,
+          isFixture: false,
+          isLive: true,
+          sourceProvenance: {
+            sourceId: this.sourceId,
+            sourceName: this.sourceName,
+            sourceTier: 2,
+            sourceType: 'AUTHORISED_AGGREGATOR',
+            originalListingId: urlHash,
+            originalUrl: item.url,
+            sourceListingUrl: item.url,
+            employerName: item.company && item.company.trim() ? item.company.trim() : 'Unspecified Employer',
+            publicationDate: pubDate,
+            lastVerifiedDate: today,
+            lastSeenAt: today,
+            expiresAt: undefined,
+            sourceStatus: 'LIVE_EXTERNAL',
+            verificationStatus: 'VERIFIED',
+            destinationStatus: 'LISTING_ONLY',
+            freshnessStatus: 'NEW',
+            applicationDestination: item.url,
+            applicationUrl: item.url,
+            isRealVerified: true,
+            isFixture: false,
+            isLive: true,
+            attributionRequired: true,
+            attributionConfig: {
+              providerName: 'Careerjet',
+              text: 'Powered by Careerjet',
+              termsUrl: 'https://www.careerjet.co.za/',
+            },
+          },
+        };
+
+        opportunities.push(opp);
+      }
+
+      registry.recordRequest(this.sourceId, true, opportunities.length, 0, 0);
+      return opportunities;
+    } catch (e: any) {
+      registry.recordRequest(this.sourceId, false, 0, 0, 0);
+      return [];
+    }
   }
 }
 

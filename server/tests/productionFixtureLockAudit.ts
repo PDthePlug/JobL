@@ -90,17 +90,17 @@ export async function runProductionFixtureLockAudit(): Promise<{ passed: number;
   assert(!t5FixtureExecuted, 'TEST 5', 'Development + omitted includeFixtures → fixture adapters do not execute');
 
   // -------------------------------------------------------------
-  // TEST 6 — Careerjet NOT_IMPLEMENTED remains skipped
+  // TEST 6 — Careerjet LIVE_EXTERNAL is eligible
   // -------------------------------------------------------------
-  log('--- TEST 6: Careerjet NOT_IMPLEMENTED remains skipped ---');
+  log('--- TEST 6: Careerjet LIVE_EXTERNAL is eligible ---');
   process.env.NODE_ENV = 'production';
   resetCounts();
   await pipeline.fetchAllValidatedOpportunities({});
   const careerjetEntry = registry.getEntry('careerjet_sa');
   assert(
-    careerjetEntry?.status === 'NOT_IMPLEMENTED' && careerjetEntry?.requestsCount === 0,
+    careerjetEntry?.status === 'LIVE_EXTERNAL' && (careerjetEntry?.requestsCount || 0) > 0,
     'TEST 6',
-    'Careerjet NOT_IMPLEMENTED remains skipped (requestsCount = 0)'
+    'Careerjet LIVE_EXTERNAL is eligible (requestsCount > 0)'
   );
 
   // -------------------------------------------------------------

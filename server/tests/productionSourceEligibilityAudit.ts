@@ -88,8 +88,8 @@ export async function runProductionSourceEligibilityAudit(): Promise<{ passed: n
   // Restore to what it was
   process.env.NODE_ENV = originalEnv;
 
-  // TEST 8: Skipping Careerjet does not increment failedRequestsCount.
-  assert(careerjet !== undefined && careerjet.failedRequestsCount === 0, 'TEST 8', 'Skipping Careerjet does not increment failedRequestsCount.');
+  // TEST 8: Careerjet executes because it is LIVE_EXTERNAL.
+  assert(careerjet !== undefined && careerjet.requestsCount > 0, 'TEST 8', 'Careerjet executes because it is LIVE_EXTERNAL.');
 
   // TEST 9: Skipping fixtures does not increment failedRequestsCount.
   const skippedFixturesDidNotFail = fixtureEntries.every(e => e.failedRequestsCount === 0);

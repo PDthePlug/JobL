@@ -91,7 +91,7 @@ export async function runSourceHonestyAudit(): Promise<{ passed: number; failed:
     retail_official_portals: 'STATIC_FIXTURE',
     adzuna_sa: 'LIVE_EXTERNAL',
     jooble_sa: 'LIVE_EXTERNAL',
-    careerjet_sa: 'NOT_IMPLEMENTED',
+    careerjet_sa: 'LIVE_EXTERNAL',
     pnet_sa_partnership: 'PARTNERSHIP_REQUIRED',
   };
 
@@ -233,10 +233,19 @@ export async function runSourceHonestyAudit(): Promise<{ passed: number; failed:
   log('\n--- TEST 8: CAREERJET HONESTY ---');
   const careerjetAdapter = adaptersMap.careerjet_sa;
   const careerjetStatus = await careerjetAdapter.getStatus();
-  const careerjetOpps = await careerjetAdapter.fetchOpportunities();
 
-  const careerjetHonest = careerjetStatus === 'NOT_IMPLEMENTED' && careerjetOpps.length === 0;
-  assert(careerjetHonest, 'TEST 8 (Careerjet Honesty)', `Careerjet status is NOT_IMPLEMENTED and returns 0 items`);
+  const savedCjKey = process.env.CAREERJET_API_KEY;
+  const savedCjAff = process.env.CAREERJET_AFFILIATE_ID;
+  delete process.env.CAREERJET_API_KEY;
+  delete process.env.CAREERJET_AFFILIATE_ID;
+
+  const careerjetOppsNoKey = await careerjetAdapter.fetchOpportunities();
+  const careerjetHonest = careerjetStatus === 'LIVE_EXTERNAL' && careerjetOppsNoKey.length === 0;
+
+  if (savedCjKey) process.env.CAREERJET_API_KEY = savedCjKey;
+  if (savedCjAff) process.env.CAREERJET_AFFILIATE_ID = savedCjAff;
+
+  assert(careerjetHonest, 'TEST 8 (Careerjet Honesty)', `Careerjet status is LIVE_EXTERNAL and returns 0 items when credentials/context are missing`);
 
   // -------------------------------------------------------------
   // TEST 9 — INGESTION SUMMARY HONESTY
