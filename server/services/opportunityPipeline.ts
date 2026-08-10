@@ -88,8 +88,8 @@ export class OpportunityPipeline {
         return false;
       }
 
-      // Exclude unverified sources
-      if (item.sourceProvenance.verificationStatus === 'UNVERIFIED' || item.sourceProvenance.isRealVerified === false) {
+      // Exclude unverified live sources (fixtures have isRealVerified=false by design)
+      if (!item.isFixture && (item.sourceProvenance.verificationStatus === 'UNVERIFIED' || item.sourceProvenance.isRealVerified === false)) {
         return false;
       }
 

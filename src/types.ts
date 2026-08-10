@@ -8,7 +8,19 @@ export type RegionType =
 
 export type VerificationStatus = 'VERIFIED' | 'PENDING' | 'UNVERIFIED' | 'FLAGGED';
 export type FreshnessStatus = 'NEW' | 'FRESH' | 'RECENT' | 'STALE' | 'EXPIRED';
-export type SourceAdapterStatus = 'LIVE' | 'PARTNER' | 'LICENSED' | 'FIXTURE' | 'DISABLED' | 'PARTNERSHIP_REQUIRED' | 'ERROR';
+export type SourceAdapterStatus = 
+  | 'LIVE' 
+  | 'LIVE_EXTERNAL' 
+  | 'STATIC_FIXTURE' 
+  | 'NOT_IMPLEMENTED' 
+  | 'PARTNER' 
+  | 'LICENSED' 
+  | 'FIXTURE' 
+  | 'FIXTURE_ONLY' 
+  | 'DEVELOPMENT_ONLY' 
+  | 'DISABLED' 
+  | 'PARTNERSHIP_REQUIRED' 
+  | 'ERROR';
 export type SourceTier = 1 | 2 | 3;
 export type SourceType = 'OFFICIAL_EMPLOYER' | 'GOVERNMENT' | 'AUTHORISED_AGGREGATOR' | 'PARTNER' | 'UNVERIFIED';
 export type DestinationStatus = 'VERIFIED' | 'REDIRECTED' | 'LISTING_ONLY' | 'UNAVAILABLE' | 'EXPIRED' | 'FAILED_VERIFICATION';

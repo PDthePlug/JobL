@@ -15,6 +15,7 @@ export interface SourceQueryParams {
   keywords?: string;
   page?: number;
   limit?: number;
+  includeFixtures?: boolean;
 }
 
 export interface ISourceAdapter {
@@ -36,7 +37,7 @@ export class DpsaPublicVacanciesAdapter implements ISourceAdapter {
   sourceType: SourceType = 'GOVERNMENT';
 
   async getStatus(): Promise<SourceAdapterStatus> {
-    return 'LIVE';
+    return 'STATIC_FIXTURE';
   }
 
   async fetchOpportunities(params?: SourceQueryParams): Promise<Opportunity[]> {
@@ -55,14 +56,14 @@ export class DpsaPublicVacanciesAdapter implements ISourceAdapter {
       lastVerifiedDate: today,
       lastSeenAt: today,
       expiresAt: '2026-08-31',
-      sourceStatus: 'LIVE',
-      verificationStatus: 'VERIFIED',
+      sourceStatus: 'STATIC_FIXTURE',
+      verificationStatus: 'UNVERIFIED',
       destinationStatus: 'VERIFIED',
       freshnessStatus: 'NEW',
       applicationDestination: 'https://www.dpsa.gov.za/dpsa2g/vacancies/VAC-2026-DPSA-0881/apply',
-      isRealVerified: true,
-      isFixture: false,
-      isLive: true,
+      isRealVerified: false,
+      isFixture: true,
+      isLive: false,
       attributionRequired: false,
     };
 
@@ -106,8 +107,8 @@ export class DpsaPublicVacanciesAdapter implements ISourceAdapter {
       postedAt: '2026-08-01',
       updatedAt: today,
       sourceProvenance: prov,
-      isFixture: false,
-      isLive: true,
+      isFixture: true,
+      isLive: false,
     };
 
     registry.recordRequest(this.sourceId, true, 1, 0, 0);
@@ -125,7 +126,7 @@ export class DelLabourVacanciesAdapter implements ISourceAdapter {
   sourceType: SourceType = 'GOVERNMENT';
 
   async getStatus(): Promise<SourceAdapterStatus> {
-    return 'LIVE';
+    return 'STATIC_FIXTURE';
   }
 
   async fetchOpportunities(params?: SourceQueryParams): Promise<Opportunity[]> {
@@ -184,18 +185,18 @@ export class DelLabourVacanciesAdapter implements ISourceAdapter {
         lastVerifiedDate: today,
         lastSeenAt: today,
         expiresAt: '2026-08-28',
-        sourceStatus: 'LIVE',
-        verificationStatus: 'VERIFIED',
+        sourceStatus: 'STATIC_FIXTURE',
+        verificationStatus: 'UNVERIFIED',
         destinationStatus: 'VERIFIED',
         freshnessStatus: 'NEW',
         applicationDestination: 'https://www.labour.gov.za/vacancies/VAC-DEL-2026-0912/apply',
-        isRealVerified: true,
-        isFixture: false,
-        isLive: true,
+        isRealVerified: false,
+        isFixture: true,
+        isLive: false,
         attributionRequired: false,
       },
-      isFixture: false,
-      isLive: true,
+      isFixture: true,
+      isLive: false,
     };
 
     registry.recordRequest(this.sourceId, true, 1, 0, 0);
@@ -213,7 +214,7 @@ export class SayouthMobiAdapter implements ISourceAdapter {
   sourceType: SourceType = 'OFFICIAL_EMPLOYER';
 
   async getStatus(): Promise<SourceAdapterStatus> {
-    return 'LIVE';
+    return 'STATIC_FIXTURE';
   }
 
   async fetchOpportunities(params?: SourceQueryParams): Promise<Opportunity[]> {
@@ -272,18 +273,18 @@ export class SayouthMobiAdapter implements ISourceAdapter {
         lastVerifiedDate: today,
         lastSeenAt: today,
         expiresAt: '2026-08-25',
-        sourceStatus: 'LIVE',
-        verificationStatus: 'VERIFIED',
+        sourceStatus: 'STATIC_FIXTURE',
+        verificationStatus: 'UNVERIFIED',
         destinationStatus: 'VERIFIED',
         freshnessStatus: 'NEW',
         applicationDestination: 'https://sayouth.mobi/opportunities/SAYOUTH-WH-2026-44/apply',
-        isRealVerified: true,
-        isFixture: false,
-        isLive: true,
+        isRealVerified: false,
+        isFixture: true,
+        isLive: false,
         attributionRequired: false,
       },
-      isFixture: false,
-      isLive: true,
+      isFixture: true,
+      isLive: false,
     };
 
     registry.recordRequest(this.sourceId, true, 1, 0, 0);
@@ -301,7 +302,7 @@ export class CciSouthAfricaAdapter implements ISourceAdapter {
   sourceType: SourceType = 'OFFICIAL_EMPLOYER';
 
   async getStatus(): Promise<SourceAdapterStatus> {
-    return 'LIVE';
+    return 'STATIC_FIXTURE';
   }
 
   async fetchOpportunities(params?: SourceQueryParams): Promise<Opportunity[]> {
@@ -365,19 +366,19 @@ export class CciSouthAfricaAdapter implements ISourceAdapter {
           lastVerifiedDate: today,
           lastSeenAt: today,
           expiresAt: '2026-09-05',
-          sourceStatus: 'LIVE',
-          verificationStatus: 'VERIFIED',
+          sourceStatus: 'STATIC_FIXTURE',
+          verificationStatus: 'UNVERIFIED',
           destinationStatus: 'VERIFIED',
           freshnessStatus: 'NEW',
           applicationDestination: 'https://ccisouthafrica.com/careers/CCI-DBN-2026-88/apply',
           applicationUrl: 'https://ccisouthafrica.com/careers/CCI-DBN-2026-88/apply',
-          isRealVerified: true,
-          isFixture: false,
-          isLive: true,
+          isRealVerified: false,
+          isFixture: true,
+          isLive: false,
           attributionRequired: false,
         },
-        isFixture: false,
-        isLive: true,
+        isFixture: true,
+        isLive: false,
       },
       {
         id: 'cci_2026_08_09',
@@ -425,19 +426,19 @@ export class CciSouthAfricaAdapter implements ISourceAdapter {
           lastVerifiedDate: today,
           lastSeenAt: today,
           expiresAt: '2026-09-08',
-          sourceStatus: 'LIVE',
-          verificationStatus: 'VERIFIED',
+          sourceStatus: 'STATIC_FIXTURE',
+          verificationStatus: 'UNVERIFIED',
           destinationStatus: 'VERIFIED',
           freshnessStatus: 'NEW',
           applicationDestination: 'https://ccisouthafrica.com/careers/CCI-CPT-2026-99/apply',
           applicationUrl: 'https://ccisouthafrica.com/careers/CCI-CPT-2026-99/apply',
-          isRealVerified: true,
-          isFixture: false,
-          isLive: true,
+          isRealVerified: false,
+          isFixture: true,
+          isLive: false,
           attributionRequired: false,
         },
-        isFixture: false,
-        isLive: true,
+        isFixture: true,
+        isLive: false,
       },
     ];
 
@@ -456,7 +457,7 @@ export class RetailCorporateAdapter implements ISourceAdapter {
   sourceType: SourceType = 'OFFICIAL_EMPLOYER';
 
   async getStatus(): Promise<SourceAdapterStatus> {
-    return 'LIVE';
+    return 'STATIC_FIXTURE';
   }
 
   async fetchOpportunities(params?: SourceQueryParams): Promise<Opportunity[]> {
@@ -520,19 +521,19 @@ export class RetailCorporateAdapter implements ISourceAdapter {
           lastVerifiedDate: today,
           lastSeenAt: today,
           expiresAt: '2026-08-30',
-          sourceStatus: 'LIVE',
-          verificationStatus: 'VERIFIED',
+          sourceStatus: 'STATIC_FIXTURE',
+          verificationStatus: 'UNVERIFIED',
           destinationStatus: 'VERIFIED',
           freshnessStatus: 'NEW',
           applicationDestination: 'https://careers.shoprite.co.za/job/SHOP-SOW-2026-004/apply',
           applicationUrl: 'https://careers.shoprite.co.za/job/SHOP-SOW-2026-004/apply',
-          isRealVerified: true,
-          isFixture: false,
-          isLive: true,
+          isRealVerified: false,
+          isFixture: true,
+          isLive: false,
           attributionRequired: false,
         },
-        isFixture: false,
-        isLive: true,
+        isFixture: true,
+        isLive: false,
       },
       {
         id: 'massmart_2026_08_10',
@@ -580,19 +581,19 @@ export class RetailCorporateAdapter implements ISourceAdapter {
           lastVerifiedDate: today,
           lastSeenAt: today,
           expiresAt: '2026-08-31',
-          sourceStatus: 'LIVE',
-          verificationStatus: 'VERIFIED',
+          sourceStatus: 'STATIC_FIXTURE',
+          verificationStatus: 'UNVERIFIED',
           destinationStatus: 'VERIFIED',
           freshnessStatus: 'NEW',
           applicationDestination: 'https://careers.massmart.co.za/job/MAK-DBN-2026-15/apply',
           applicationUrl: 'https://careers.massmart.co.za/job/MAK-DBN-2026-15/apply',
-          isRealVerified: true,
-          isFixture: false,
-          isLive: true,
+          isRealVerified: false,
+          isFixture: true,
+          isLive: false,
           attributionRequired: false,
         },
-        isFixture: false,
-        isLive: true,
+        isFixture: true,
+        isLive: false,
       },
       {
         id: 'capitec_2026_08_06',
@@ -645,18 +646,18 @@ export class RetailCorporateAdapter implements ISourceAdapter {
           lastVerifiedDate: today,
           lastSeenAt: today,
           expiresAt: '2026-08-29',
-          sourceStatus: 'LIVE',
-          verificationStatus: 'VERIFIED',
+          sourceStatus: 'STATIC_FIXTURE',
+          verificationStatus: 'UNVERIFIED',
           destinationStatus: 'VERIFIED',
           freshnessStatus: 'NEW',
           applicationDestination: 'https://careers.capitecbank.co.za/job/CAP-KHY-2026-102/apply',
-          isRealVerified: true,
-          isFixture: false,
-          isLive: true,
+          isRealVerified: false,
+          isFixture: true,
+          isLive: false,
           attributionRequired: false,
         },
-        isFixture: false,
-        isLive: true,
+        isFixture: true,
+        isLive: false,
       },
       {
         id: 'transnet_2026_08_07',
@@ -709,18 +710,18 @@ export class RetailCorporateAdapter implements ISourceAdapter {
           lastVerifiedDate: today,
           lastSeenAt: today,
           expiresAt: '2026-08-27',
-          sourceStatus: 'LIVE',
-          verificationStatus: 'VERIFIED',
+          sourceStatus: 'STATIC_FIXTURE',
+          verificationStatus: 'UNVERIFIED',
           destinationStatus: 'VERIFIED',
           freshnessStatus: 'NEW',
           applicationDestination: 'https://careers.transnet.net/job/TRN-PLZ-2026-90/apply',
-          isRealVerified: true,
-          isFixture: false,
-          isLive: true,
+          isRealVerified: false,
+          isFixture: true,
+          isLive: false,
           attributionRequired: false,
         },
-        isFixture: false,
-        isLive: true,
+        isFixture: true,
+        isLive: false,
       },
       {
         id: 'vodacom_2026_08_08',
@@ -773,18 +774,18 @@ export class RetailCorporateAdapter implements ISourceAdapter {
           lastVerifiedDate: today,
           lastSeenAt: today,
           expiresAt: '2026-08-31',
-          sourceStatus: 'LIVE',
-          verificationStatus: 'VERIFIED',
+          sourceStatus: 'STATIC_FIXTURE',
+          verificationStatus: 'UNVERIFIED',
           destinationStatus: 'VERIFIED',
           freshnessStatus: 'NEW',
           applicationDestination: 'https://careers.vodacom.com/job/VOD-PLK-2026-301/apply',
-          isRealVerified: true,
-          isFixture: false,
-          isLive: true,
+          isRealVerified: false,
+          isFixture: true,
+          isLive: false,
           attributionRequired: false,
         },
-        isFixture: false,
-        isLive: true,
+        isFixture: true,
+        isLive: false,
       },
     ];
 
@@ -836,7 +837,7 @@ export class AdzunaAdapter implements ISourceAdapter {
   sourceType: SourceType = 'AUTHORISED_AGGREGATOR';
 
   async getStatus(): Promise<SourceAdapterStatus> {
-    return 'LICENSED';
+    return 'LIVE_EXTERNAL';
   }
 
   async fetchOpportunities(params?: SourceQueryParams): Promise<Opportunity[]> {
@@ -915,7 +916,7 @@ export class AdzunaAdapter implements ISourceAdapter {
                   lastVerifiedDate: today,
                   lastSeenAt: today,
                   expiresAt: '2026-09-15',
-                  sourceStatus: 'LICENSED',
+                  sourceStatus: 'LIVE_EXTERNAL',
                   verificationStatus: 'VERIFIED',
                   destinationStatus: 'VERIFIED',
                   freshnessStatus: 'NEW',
@@ -942,88 +943,12 @@ export class AdzunaAdapter implements ISourceAdapter {
         }
       } catch (e: any) {
         registry.recordRequest(this.sourceId, false, 0, 0, 0);
+        return [];
       }
     }
 
-    // Structured Live Aggregator Opportunity Fallback (when API key is absent or network unavailable)
-    const items: Opportunity[] = [
-      {
-        id: 'adzuna_za_001',
-        title: 'Virtual Assistant & Administrative Coordinator',
-        employer: 'Boldly Remote Services',
-        location: {
-          city: 'Cape Town',
-          province: 'Western Cape',
-          regionType: 'REMOTE_SA',
-          country: 'South Africa',
-          remoteStatus: 'REMOTE_SA',
-          relocationStatus: 'NOT_ALLOWED',
-          geographicEligibility: { isSouthAfricaEligible: true, isLocalOnly: false, allowedCountries: ['South Africa'] },
-        },
-        jobCategory: 'Administration & Clerical',
-        employmentType: 'Full-time',
-        experienceLevel: 'Entry level',
-        qualificationRequirement: 'Grade 12 Certificate',
-        salary: {
-          formatted: 'R12,000 – R15,500 per month',
-          period: 'Monthly',
-          minAmount: 12000,
-          maxAmount: 15500,
-          currency: 'ZAR',
-        },
-        summary: 'Provide remote calendar management, email correspondence, and documentation support for South African business executives.',
-        fullDescription: 'Boldly Remote is hiring Virtual Assistants. You will handle schedule coordination, travel arrangements, data entry, customer ticket routing, and administrative support remotely.',
-        requirements: [
-          'Grade 12 / Matric',
-          'Stable home internet connection (10Mbps+)',
-          'Strong command of English grammar',
-          'Proficiency in Google Workspace / MS Office',
-        ],
-        responsibilities: [
-          'Manage client inbox and prioritize urgent communications',
-          'Schedule virtual appointments and calendar reminders',
-          'Prepare weekly administrative summaries and spreadsheet reports',
-        ],
-        skillsRequired: ['Calendar Management', 'Google Workspace', 'Email Etiquette', 'Organization'],
-        closingDate: '2026-09-01',
-        postedAt: '2026-08-01',
-        updatedAt: today,
-        sourceProvenance: {
-          sourceId: this.sourceId,
-          sourceName: this.sourceName,
-          sourceTier: 2,
-          sourceType: 'AUTHORISED_AGGREGATOR',
-          originalListingId: 'ADZ-CPT-2026-101',
-          originalUrl: 'https://www.adzuna.co.za/details/ADZ-CPT-2026-101',
-          sourceListingUrl: 'https://www.adzuna.co.za/details/ADZ-CPT-2026-101',
-          employerName: 'Boldly Remote Services',
-          publicationDate: '2026-08-01',
-          lastVerifiedDate: today,
-          lastSeenAt: today,
-          expiresAt: '2026-09-01',
-          sourceStatus: 'LICENSED',
-          verificationStatus: 'VERIFIED',
-          destinationStatus: 'VERIFIED',
-          freshnessStatus: 'NEW',
-          applicationDestination: 'https://www.adzuna.co.za/details/ADZ-CPT-2026-101/apply',
-          applicationUrl: 'https://www.adzuna.co.za/details/ADZ-CPT-2026-101/apply',
-          isRealVerified: true,
-          isFixture: false,
-          isLive: true,
-          attributionRequired: true,
-          attributionConfig: {
-            providerName: 'Adzuna',
-            text: 'Powered by Adzuna',
-            termsUrl: 'https://www.adzuna.co.za/',
-          },
-        },
-        isFixture: false,
-        isLive: true,
-      },
-    ];
-
-    registry.recordRequest(this.sourceId, true, items.length, 0, 0);
-    return items;
+    registry.recordRequest(this.sourceId, false, 0, 0, 0);
+    return [];
   }
 }
 
@@ -1037,7 +962,7 @@ export class JoobleAdapter implements ISourceAdapter {
   sourceType: SourceType = 'AUTHORISED_AGGREGATOR';
 
   async getStatus(): Promise<SourceAdapterStatus> {
-    return 'LICENSED';
+    return 'LIVE_EXTERNAL';
   }
 
   async fetchOpportunities(params?: SourceQueryParams): Promise<Opportunity[]> {
@@ -1111,7 +1036,7 @@ export class JoobleAdapter implements ISourceAdapter {
                     lastVerifiedDate: today,
                     lastSeenAt: today,
                     expiresAt: '2026-09-20',
-                    sourceStatus: 'LICENSED',
+                    sourceStatus: 'LIVE_EXTERNAL',
                     verificationStatus: 'VERIFIED',
                     destinationStatus: 'VERIFIED',
                     freshnessStatus: 'NEW',
@@ -1132,165 +1057,18 @@ export class JoobleAdapter implements ISourceAdapter {
                 };
               });
 
-            const sonderInt: Opportunity = {
-              id: 'jooble_za_002',
-              title: 'Customer Experience Associate (Remote International)',
-              employer: 'Sonder Global (US / Worldwide Remote)',
-              location: {
-                city: 'Johannesburg',
-                province: 'Gauteng',
-                regionType: 'REMOTE_INT',
-                country: 'South Africa',
-                remoteStatus: 'REMOTE_INT',
-                relocationStatus: 'NOT_ALLOWED',
-                geographicEligibility: { isSouthAfricaEligible: true, isLocalOnly: false, allowedCountries: ['South Africa', 'United States'] },
-              },
-              jobCategory: 'Call Centre & Customer Service',
-              employmentType: 'Full-time',
-              experienceLevel: 'Entry level',
-              qualificationRequirement: 'Grade 12 Certificate',
-              salary: {
-                formatted: '$850 – $1,100 per month (approx. R15,500 – R20,000)',
-                period: 'Monthly',
-                minAmount: 15500,
-                maxAmount: 20000,
-                currency: 'USD',
-              },
-              summary: 'Remote customer hospitality support handling guest reservations and chat requests globally.',
-              fullDescription: 'Sonder Global is hiring Remote Customer Experience Associates located in South Africa. Working in GMT+2 timezone, you will answer guest inquiries, resolve booking changes, and collaborate with property operations teams.',
-              requirements: [
-                'Matric / Senior Certificate',
-                'Excellent written English skills',
-                'Quiet home workspace with high-speed fiber internet and uninterrupted power supply (UPS / inverter)',
-              ],
-              responsibilities: [
-                'Provide real-time messaging support to hotel & apartment guests',
-                'Process check-in modifications and issue resolutions in booking platform',
-              ],
-              skillsRequired: ['Customer Experience', 'Hospitality', 'Written Communication', 'Problem Solving'],
-              closingDate: '2026-09-02',
-              postedAt: '2026-08-02',
-              updatedAt: today,
-              sourceProvenance: {
-                sourceId: this.sourceId,
-                sourceName: this.sourceName,
-                sourceTier: 2,
-                sourceType: 'AUTHORISED_AGGREGATOR',
-                originalListingId: 'JOOB-SONDER-2026-12',
-                originalUrl: 'https://za.jooble.org/desc/JOOB-SONDER-2026-12',
-                sourceListingUrl: 'https://za.jooble.org/desc/JOOB-SONDER-2026-12',
-                employerName: 'Sonder Global (US / Worldwide Remote)',
-                publicationDate: '2026-08-02',
-                lastVerifiedDate: today,
-                lastSeenAt: today,
-                expiresAt: '2026-09-02',
-                sourceStatus: 'LICENSED',
-                verificationStatus: 'VERIFIED',
-                destinationStatus: 'VERIFIED',
-                freshnessStatus: 'NEW',
-                applicationDestination: 'https://za.jooble.org/desc/JOOB-SONDER-2026-12/apply',
-                applicationUrl: 'https://za.jooble.org/desc/JOOB-SONDER-2026-12/apply',
-                isRealVerified: true,
-                isFixture: false,
-                isLive: true,
-                attributionRequired: true,
-                attributionConfig: {
-                  providerName: 'Jooble',
-                  text: 'Powered by Jooble',
-                  termsUrl: 'https://za.jooble.org/',
-                },
-              },
-              isFixture: false,
-              isLive: true,
-            };
-
-            const combinedItems = [...apiItems, sonderInt];
-            registry.recordRequest(this.sourceId, true, combinedItems.length, 0, 0);
-            return combinedItems;
+            registry.recordRequest(this.sourceId, true, apiItems.length, 0, 0);
+            return apiItems;
           }
         }
       } catch (e: any) {
         registry.recordRequest(this.sourceId, false, 0, 0, 0);
+        return [];
       }
     }
 
-    // Structured Fallback
-    const items: Opportunity[] = [
-      {
-        id: 'jooble_za_002',
-        title: 'Customer Experience Associate (Remote International)',
-        employer: 'Sonder Global (US / Worldwide Remote)',
-        location: {
-          city: 'Johannesburg',
-          province: 'Gauteng',
-          regionType: 'REMOTE_INT',
-          country: 'South Africa',
-          remoteStatus: 'REMOTE_INT',
-          relocationStatus: 'NOT_ALLOWED',
-          geographicEligibility: { isSouthAfricaEligible: true, isLocalOnly: false, allowedCountries: ['South Africa', 'United States'] },
-        },
-        jobCategory: 'Call Centre & Customer Service',
-        employmentType: 'Full-time',
-        experienceLevel: 'Entry level',
-        qualificationRequirement: 'Grade 12 Certificate',
-        salary: {
-          formatted: '$850 – $1,100 per month (approx. R15,500 – R20,000)',
-          period: 'Monthly',
-          minAmount: 15500,
-          maxAmount: 20000,
-          currency: 'USD',
-        },
-        summary: 'Remote customer hospitality support handling guest reservations and chat requests globally.',
-        fullDescription: 'Sonder Global is hiring Remote Customer Experience Associates located in South Africa. Working in GMT+2 timezone, you will answer guest inquiries, resolve booking changes, and collaborate with property operations teams.',
-        requirements: [
-          'Matric / Senior Certificate',
-          'Excellent written English skills',
-          'Quiet home workspace with high-speed fiber internet and uninterrupted power supply (UPS / inverter)',
-        ],
-        responsibilities: [
-          'Provide real-time messaging support to hotel & apartment guests',
-          'Process check-in modifications and issue resolutions in booking platform',
-        ],
-        skillsRequired: ['Customer Experience', 'Hospitality', 'Written Communication', 'Problem Solving'],
-        closingDate: '2026-09-02',
-        postedAt: '2026-08-02',
-        updatedAt: today,
-        sourceProvenance: {
-          sourceId: this.sourceId,
-          sourceName: this.sourceName,
-          sourceTier: 2,
-          sourceType: 'AUTHORISED_AGGREGATOR',
-          originalListingId: 'JOOB-SONDER-2026-12',
-          originalUrl: 'https://za.jooble.org/desc/JOOB-SONDER-2026-12',
-          sourceListingUrl: 'https://za.jooble.org/desc/JOOB-SONDER-2026-12',
-          employerName: 'Sonder Global (US / Worldwide Remote)',
-          publicationDate: '2026-08-02',
-          lastVerifiedDate: today,
-          lastSeenAt: today,
-          expiresAt: '2026-09-02',
-          sourceStatus: 'LICENSED',
-          verificationStatus: 'VERIFIED',
-          destinationStatus: 'VERIFIED',
-          freshnessStatus: 'NEW',
-          applicationDestination: 'https://za.jooble.org/desc/JOOB-SONDER-2026-12/apply',
-          applicationUrl: 'https://za.jooble.org/desc/JOOB-SONDER-2026-12/apply',
-          isRealVerified: true,
-          isFixture: false,
-          isLive: true,
-          attributionRequired: true,
-          attributionConfig: {
-            providerName: 'Jooble',
-            text: 'Powered by Jooble',
-            termsUrl: 'https://za.jooble.org/',
-          },
-        },
-        isFixture: false,
-        isLive: true,
-      },
-    ];
-
-    registry.recordRequest(this.sourceId, true, items.length, 0, 0);
-    return items;
+    registry.recordRequest(this.sourceId, false, 0, 0, 0);
+    return [];
   }
 }
 
@@ -1304,84 +1082,13 @@ export class CareerjetAdapter implements ISourceAdapter {
   sourceType: SourceType = 'AUTHORISED_AGGREGATOR';
 
   async getStatus(): Promise<SourceAdapterStatus> {
-    return 'LICENSED';
+    return 'NOT_IMPLEMENTED';
   }
 
   async fetchOpportunities(params?: SourceQueryParams): Promise<Opportunity[]> {
-    const today = new Date().toISOString().split('T')[0];
     const registry = SourceRegistry.getInstance();
-
-    const items: Opportunity[] = [
-      {
-        id: 'careerjet_za_003',
-        title: 'Junior Debtors & Billing Clerk',
-        employer: 'MediClinic Southern Africa',
-        location: {
-          city: 'Bloemfontein',
-          province: 'Free State',
-          regionType: 'LOCAL',
-          country: 'South Africa',
-        },
-        jobCategory: 'Administration & Clerical',
-        employmentType: 'Full-time',
-        experienceLevel: 'Entry level',
-        qualificationRequirement: 'Grade 12 with Accounting / Bookkeeping',
-        salary: {
-          formatted: 'R11,000 – R13,500 per month',
-          period: 'Monthly',
-          minAmount: 11000,
-          maxAmount: 13500,
-          currency: 'ZAR',
-        },
-        summary: 'Process medical aid claims, patient billing statements, and debt recovery inquiries at hospital administrative department.',
-        fullDescription: 'MediClinic Bloemfontein is recruiting a Junior Debtors Clerk. Responsible for validating patient medical scheme authorization, capturing patient accounts, and following up on outstanding medical claims.',
-        requirements: [
-          'Grade 12 with Accounting passed',
-          'Basic Excel skills',
-          'Good numerical accuracy and attention to detail',
-        ],
-        responsibilities: [
-          'Capture daily patient billing invoices into SAP hospital portal',
-          'Reconcile medical scheme payments against patient accounts',
-        ],
-        skillsRequired: ['Medical Claims', 'Debtors', 'Excel', 'SAP'],
-        closingDate: '2026-08-30',
-        postedAt: '2026-08-03',
-        updatedAt: today,
-        sourceProvenance: {
-          sourceId: this.sourceId,
-          sourceName: this.sourceName,
-          sourceTier: 2,
-          sourceType: 'AUTHORISED_AGGREGATOR',
-          originalListingId: 'CJ-MED-2026-88',
-          originalUrl: 'https://www.careerjet.co.za/job/CJ-MED-2026-88',
-          employerName: 'MediClinic Southern Africa',
-          publicationDate: '2026-08-03',
-          lastVerifiedDate: today,
-          lastSeenAt: today,
-          expiresAt: '2026-08-30',
-          sourceStatus: 'LICENSED',
-          verificationStatus: 'VERIFIED',
-          destinationStatus: 'VERIFIED',
-          freshnessStatus: 'NEW',
-          applicationDestination: 'https://www.careerjet.co.za/job/CJ-MED-2026-88/apply',
-          isRealVerified: true,
-          isFixture: false,
-          isLive: true,
-          attributionRequired: true,
-          attributionConfig: {
-            providerName: 'Careerjet',
-            text: 'Powered by Careerjet',
-            termsUrl: 'https://www.careerjet.co.za/',
-          },
-        },
-        isFixture: false,
-        isLive: true,
-      },
-    ];
-
-    registry.recordRequest(this.sourceId, true, items.length, 0, 0);
-    return items;
+    registry.recordRequest(this.sourceId, false, 0, 0, 0);
+    return [];
   }
 }
 
@@ -1402,7 +1109,6 @@ export class PNetAdapter implements ISourceAdapter {
 
   async fetchOpportunities(params?: SourceQueryParams): Promise<Opportunity[]> {
     const registry = SourceRegistry.getInstance();
-    // Safely return empty list until partnership feed is activated
     registry.recordRequest(this.sourceId, true, 0, 0, 0);
     return [];
   }

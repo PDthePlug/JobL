@@ -22,7 +22,7 @@ export class SourceRegistry {
       sourceName: 'DPSA Public Service Vacancies',
       tier: 1,
       sourceType: 'GOVERNMENT',
-      status: 'LIVE',
+      status: 'STATIC_FIXTURE',
       authType: 'PUBLIC',
       supportsSearch: true,
       supportsLocation: true,
@@ -42,7 +42,7 @@ export class SourceRegistry {
       sourceName: 'Dept of Employment & Labour Portal',
       tier: 1,
       sourceType: 'GOVERNMENT',
-      status: 'LIVE',
+      status: 'STATIC_FIXTURE',
       authType: 'PUBLIC',
       supportsSearch: true,
       supportsLocation: true,
@@ -62,7 +62,7 @@ export class SourceRegistry {
       sourceName: 'SA Youth / YES Network Portal',
       tier: 1,
       sourceType: 'OFFICIAL_EMPLOYER',
-      status: 'LIVE',
+      status: 'STATIC_FIXTURE',
       authType: 'PUBLIC',
       supportsSearch: true,
       supportsLocation: true,
@@ -82,7 +82,7 @@ export class SourceRegistry {
       sourceName: 'CCI South Africa Career Portal',
       tier: 1,
       sourceType: 'OFFICIAL_EMPLOYER',
-      status: 'LIVE',
+      status: 'STATIC_FIXTURE',
       authType: 'PUBLIC',
       supportsSearch: true,
       supportsLocation: true,
@@ -102,7 +102,7 @@ export class SourceRegistry {
       sourceName: 'Official Employer Portals (Shoprite, Capitec, Transnet, Vodacom)',
       tier: 1,
       sourceType: 'OFFICIAL_EMPLOYER',
-      status: 'LIVE',
+      status: 'STATIC_FIXTURE',
       authType: 'PUBLIC',
       supportsSearch: true,
       supportsLocation: true,
@@ -123,7 +123,7 @@ export class SourceRegistry {
       sourceName: 'Adzuna SA API',
       tier: 2,
       sourceType: 'AUTHORISED_AGGREGATOR',
-      status: 'LICENSED',
+      status: 'LIVE_EXTERNAL',
       authType: 'API_KEY',
       supportsSearch: true,
       supportsLocation: true,
@@ -149,7 +149,7 @@ export class SourceRegistry {
       sourceName: 'Jooble REST API',
       tier: 2,
       sourceType: 'AUTHORISED_AGGREGATOR',
-      status: 'LICENSED',
+      status: 'LIVE_EXTERNAL',
       authType: 'API_KEY',
       supportsSearch: true,
       supportsLocation: true,
@@ -175,7 +175,7 @@ export class SourceRegistry {
       sourceName: 'Careerjet Publisher API',
       tier: 2,
       sourceType: 'AUTHORISED_AGGREGATOR',
-      status: 'LICENSED',
+      status: 'NOT_IMPLEMENTED',
       authType: 'AFFILIATE_ID',
       supportsSearch: true,
       supportsLocation: true,
@@ -238,7 +238,7 @@ export class SourceRegistry {
 
   public getActiveEntries(): SourceRegistryEntry[] {
     return Array.from(this.registryMap.values()).filter(
-      (entry) => entry.status === 'LIVE' || entry.status === 'LICENSED' || entry.status === 'PARTNER'
+      (entry) => entry.status === 'LIVE' || entry.status === 'LIVE_EXTERNAL' || entry.status === 'LICENSED' || entry.status === 'PARTNER'
     );
   }
 
