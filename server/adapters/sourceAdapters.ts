@@ -1086,8 +1086,6 @@ export class CareerjetAdapter implements ISourceAdapter {
   }
 
   async fetchOpportunities(params?: SourceQueryParams): Promise<Opportunity[]> {
-    const registry = SourceRegistry.getInstance();
-    registry.recordRequest(this.sourceId, false, 0, 0, 0);
     return [];
   }
 }
@@ -1108,8 +1106,6 @@ export class PNetAdapter implements ISourceAdapter {
   }
 
   async fetchOpportunities(params?: SourceQueryParams): Promise<Opportunity[]> {
-    const registry = SourceRegistry.getInstance();
-    registry.recordRequest(this.sourceId, true, 0, 0, 0);
     return [];
   }
 }

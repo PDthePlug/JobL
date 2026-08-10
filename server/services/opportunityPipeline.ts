@@ -59,11 +59,21 @@ export class OpportunityPipeline {
 
     const activeAdapters = this.adapters.filter((adapter) => {
       const entry = this.registry.getEntry(adapter.sourceId);
-      if (!entry) return true;
-      if (entry.status === 'DISABLED' || entry.status === 'PARTNERSHIP_REQUIRED') {
-        return false;
+      if (!entry) return false;
+
+      const status = entry.status;
+      const isLiveEligible = status === 'LIVE' || status === 'LIVE_EXTERNAL' || status === 'LICENSED' || status === 'PARTNER';
+      const isFixture = status === 'STATIC_FIXTURE' || status === 'FIXTURE' || status === 'FIXTURE_ONLY' || status === 'DEVELOPMENT_ONLY';
+
+      if (isLiveEligible) {
+        return true;
       }
-      return true;
+      
+      if (isFixture && params?.includeFixtures === true) {
+        return true;
+      }
+
+      return false;
     });
 
     // 2. Fetch from active adapters in parallel
