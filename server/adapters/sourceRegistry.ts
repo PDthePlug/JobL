@@ -22,7 +22,7 @@ export class SourceRegistry {
       sourceName: 'DPSA Public Service Vacancies',
       tier: 1,
       sourceType: 'GOVERNMENT',
-      status: 'STATIC_FIXTURE',
+      status: 'LIVE_EXTERNAL',
       authType: 'PUBLIC',
       supportsSearch: true,
       supportsLocation: true,

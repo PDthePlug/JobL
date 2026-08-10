@@ -7,6 +7,7 @@ import {
   FreshnessStatus,
 } from '../../src/types.ts';
 import { SourceRegistry } from './sourceRegistry.ts';
+import pdfParse from 'pdf-parse';
 
 export interface SourceQueryParams {
   city?: string;
@@ -32,6 +33,7 @@ export interface ISourceAdapter {
 
 /**
  * 1. DPSA Public Vacancies Adapter (Tier 1 Government)
+ * Genuine live acquisition from official DPSA Public Service Vacancy Circulars (PSVC)
  */
 export class DpsaPublicVacanciesAdapter implements ISourceAdapter {
   sourceId = 'dpsa_gov_za';
@@ -40,82 +42,310 @@ export class DpsaPublicVacanciesAdapter implements ISourceAdapter {
   sourceType: SourceType = 'GOVERNMENT';
 
   async getStatus(): Promise<SourceAdapterStatus> {
-    return 'STATIC_FIXTURE';
+    return 'LIVE_EXTERNAL';
   }
 
   async fetchOpportunities(params?: SourceQueryParams): Promise<Opportunity[]> {
     const today = new Date().toISOString().split('T')[0];
     const registry = SourceRegistry.getInstance();
 
-    const prov: JobSourceProvenance = {
-      sourceId: this.sourceId,
-      sourceName: this.sourceName,
-      sourceTier: 1,
-      sourceType: 'GOVERNMENT',
-      originalListingId: 'VAC-2026-DPSA-0881',
-      originalUrl: 'https://www.dpsa.gov.za/dpsa2g/vacancies/VAC-2026-DPSA-0881',
-      employerName: 'Department of Public Service and Administration',
-      publicationDate: '2026-08-01',
-      lastVerifiedDate: today,
-      lastSeenAt: today,
-      expiresAt: '2026-08-31',
-      sourceStatus: 'STATIC_FIXTURE',
-      verificationStatus: 'UNVERIFIED',
-      destinationStatus: 'VERIFIED',
-      freshnessStatus: 'NEW',
-      applicationDestination: 'https://www.dpsa.gov.za/dpsa2g/vacancies/VAC-2026-DPSA-0881/apply',
-      isRealVerified: false,
-      isFixture: true,
-      isLive: false,
-      attributionRequired: false,
-    };
+    try {
+      // 1. Fetch official DPSA circular index page
+      const indexUrl = 'https://www.dpsa.gov.za/newsroom/psvc/';
+      const indexRes = await fetch(indexUrl, {
+        headers: {
+          'User-Agent': 'JobL-TruthConsolidation-Engine/1.0 (+https://jobl.co.za)',
+        },
+      });
 
-    const item: Opportunity = {
-      id: 'dpsa_2026_08_01',
-      title: 'Administration Clerk (Entry Level)',
-      employer: 'Department of Public Service and Administration',
-      location: {
-        city: 'Pretoria',
-        province: 'Gauteng',
-        regionType: 'LOCAL',
-        country: 'South Africa',
-      },
-      jobCategory: 'Administration & Clerical',
-      employmentType: 'Full-time',
-      experienceLevel: 'Entry level',
-      qualificationRequirement: 'Grade 12 / National Senior Certificate',
-      salary: {
-        formatted: 'R181,599 – R213,888 per annum',
-        period: 'Annual',
-        minAmount: 181599,
-        maxAmount: 213888,
-        currency: 'ZAR',
-      },
-      summary: 'Provide clerical support, records management, registry and document filing services at the provincial office.',
-      fullDescription: 'The Department of Public Service and Administration is seeking an Administration Clerk to perform registry duties, assist with public inquiries, process incoming documentation, maintain document management systems, and support senior administrative staff. Applicants must hold a Grade 12 certificate. Computer literacy (MS Office) is required.',
-      requirements: [
-        'Grade 12 (Matric / Senior Certificate)',
-        'Basic computer literacy (MS Word, Excel)',
-        'Good written and spoken communication in English',
-        'South African ID / Permanent Resident',
-      ],
-      responsibilities: [
-        'Receive, log, and route incoming correspondence and files',
-        'Maintain clean physical and digital filing registry',
-        'Answer phone inquiries from public and departmental stakeholders',
-        'Assist with document reproduction and meeting arrangements',
-      ],
-      skillsRequired: ['Filing', 'Data Entry', 'Customer Service', 'MS Office'],
-      closingDate: '2026-08-31',
-      postedAt: '2026-08-01',
-      updatedAt: today,
-      sourceProvenance: prov,
-      isFixture: true,
-      isLive: false,
-    };
+      if (!indexRes.ok) {
+        throw new Error(`DPSA index returned HTTP ${indexRes.status}`);
+      }
 
-    registry.recordRequest(this.sourceId, true, 1, 0, 0);
-    return [item];
+      const indexHtml = await indexRes.text();
+
+      // 2. Discover active circular pages (e.g. /newsroom/psvc/circular-28-of-2026/)
+      const circRegex = /href=['"](\/newsroom\/psvc\/circular-(\d+)-of-(\d+)\/)['"]/gi;
+      const matches = [...indexHtml.matchAll(circRegex)];
+      if (matches.length === 0) {
+        throw new Error('No circular links discovered on DPSA index page');
+      }
+
+      const circulars = matches
+        .map(m => ({
+          url: 'https://www.dpsa.gov.za' + m[1],
+          num: parseInt(m[2], 10),
+          year: parseInt(m[3], 10),
+        }))
+        .sort((a, b) => b.year - a.year || b.num - a.num);
+
+      const latestCirc = circulars[0];
+
+      // 3. Fetch latest circular page to discover annexure PDF links
+      const detailRes = await fetch(latestCirc.url, {
+        headers: {
+          'User-Agent': 'JobL-TruthConsolidation-Engine/1.0 (+https://jobl.co.za)',
+        },
+      });
+
+      if (!detailRes.ok) {
+        throw new Error(`DPSA circular ${latestCirc.num}/${latestCirc.year} detail returned HTTP ${detailRes.status}`);
+      }
+
+      const detailHtml = await detailRes.text();
+
+      // Find annexure PDF links (e.g. https://www.dpsa.gov.za/dpsa2g/documents/vacancies/2026/28/a.pdf)
+      const pdfRegex = /href=['"](https?:\/\/www\.dpsa\.gov\.za\/dpsa2g\/documents\/vacancies\/\d+\/\d+\/[a-z]\.pdf)['"]/gi;
+      const pdfMatches = [...detailHtml.matchAll(pdfRegex)];
+      const pdfUrls = Array.from(new Set(pdfMatches.map(m => m[1])));
+
+      if (pdfUrls.length === 0) {
+        throw new Error(`No annexure PDF links discovered for DPSA circular ${latestCirc.num}/${latestCirc.year}`);
+      }
+
+      const allOpportunities: Opportunity[] = [];
+
+      // 4. Download and parse Annexure PDFs in parallel batches of 6
+      const batchSize = 6;
+      for (let i = 0; i < pdfUrls.length; i += batchSize) {
+        const batchUrls = pdfUrls.slice(i, i + batchSize);
+        const batchResults = await Promise.all(
+          batchUrls.map(async pdfUrl => {
+            try {
+              const pdfRes = await fetch(pdfUrl, {
+                headers: {
+                  'User-Agent': 'JobL-TruthConsolidation-Engine/1.0 (+https://jobl.co.za)',
+                },
+              });
+
+              if (!pdfRes.ok) return [];
+
+              const buffer = await pdfRes.arrayBuffer();
+              const parsedPdf = await pdfParse(Buffer.from(buffer));
+              const text = parsedPdf.text;
+
+              let department = 'Department of Public Service and Administration';
+              const deptMatch = text.match(/(DEPARTMENT OF [^\n\r]+|PROVINCIAL ADMINISTRATION:[^\n\r]+|GAUTENG DEPARTMENT OF [^\n\r]+)/i);
+              if (deptMatch) {
+                department = deptMatch[1].trim().replace(/\s+/g, ' ');
+              }
+
+              let rawClosingDate = '';
+              const closingMatch = text.match(/CLOSING DATE\s*:\s*([^\n\r]+)/i);
+              if (closingMatch) {
+                rawClosingDate = closingMatch[1].trim().replace(/\s+/g, ' ');
+              }
+
+              const postRegex = /POST\s+(\d+\/\d+)\s*:\s*([^\n\r]+)/gi;
+              const postMatches = [...text.matchAll(postRegex)];
+              const itemsInPdf: Opportunity[] = [];
+
+              for (let j = 0; j < postMatches.length; j++) {
+                const match = postMatches[j];
+                const postNumber = match[1];
+                let rawTitleLine = match[2].trim().replace(/\s+/g, ' ');
+                const startIndex = match.index!;
+                const endIndex = j < postMatches.length - 1 ? postMatches[j + 1].index! : text.length;
+                const postChunk = text.slice(startIndex, endIndex);
+
+                let refNo = '';
+                const refMatch = postChunk.match(/REF NO\s*:\s*([^\n\r]+)/i);
+                if (refMatch) {
+                  refNo = refMatch[1].trim().replace(/\s+/g, ' ');
+                }
+
+                let title = rawTitleLine.replace(/REF NO\s*:.*$/i, '').trim();
+
+                let salaryText = '';
+                const salaryMatch = postChunk.match(/SALARY\s*:\s*([^\n\r]+)/i);
+                if (salaryMatch) {
+                  salaryText = salaryMatch[1].trim().replace(/\s+/g, ' ');
+                }
+
+                let centreText = '';
+                const centreMatch = postChunk.match(/CENTRE\s*:\s*([^\n\r]+)/i);
+                if (centreMatch) {
+                  centreText = centreMatch[1].trim().replace(/\s+/g, ' ');
+                }
+
+                let reqs: string[] = [];
+                const reqMatch = postChunk.match(/REQUIREMENTS\s*:\s*([\s\S]*?)(?=DUTIES|ENQUIRIES|APPLICATIONS|NOTE|POST\s+\d+\/\d+|$)/i);
+                if (reqMatch) {
+                  reqs = reqMatch[1]
+                    .trim()
+                    .split(/\.\s+|\n+/)
+                    .map(s => s.trim().replace(/\s+/g, ' '))
+                    .filter(s => s.length > 5);
+                }
+
+                let duties: string[] = [];
+                const dutyMatch = postChunk.match(/DUTIES\s*:\s*([\s\S]*?)(?=ENQUIRIES|APPLICATIONS|NOTE|REQUIREMENTS|POST\s+\d+\/\d+|$)/i);
+                if (dutyMatch) {
+                  duties = dutyMatch[1]
+                    .trim()
+                    .split(/\.\s+|\n+/)
+                    .map(s => s.trim().replace(/\s+/g, ' '))
+                    .filter(s => s.length > 5);
+                }
+
+                let enquiries = '';
+                const enqMatch = postChunk.match(/ENQUIRIES\s*:\s*([^\n\r]+)/i);
+                if (enqMatch) enquiries = enqMatch[1].trim().replace(/\s+/g, ' ');
+
+                let applications = '';
+                const appMatch = postChunk.match(/APPLICATIONS\s*:\s*([^\n\r]+)/i);
+                if (appMatch) applications = appMatch[1].trim().replace(/\s+/g, ' ');
+
+                const oppId = `dpsa_${latestCirc.year}_${latestCirc.num}_post_${postNumber.replace('/', '_')}`;
+
+                let city = 'Unknown';
+                if (/Pretoria/i.test(centreText)) city = 'Pretoria';
+                else if (/Johannesburg/i.test(centreText)) city = 'Johannesburg';
+                else if (/Cape Town/i.test(centreText)) city = 'Cape Town';
+                else if (/Durban/i.test(centreText)) city = 'Durban';
+                else if (/Bloemfontein/i.test(centreText)) city = 'Bloemfontein';
+                else if (/Polokwane/i.test(centreText)) city = 'Polokwane';
+                else if (/Nelspruit|Mbombela/i.test(centreText)) city = 'Mbombela';
+                else if (/Pietermaritzburg/i.test(centreText)) city = 'Pietermaritzburg';
+                else if (/Kimberley/i.test(centreText)) city = 'Kimberley';
+                else if (/Mahikeng|Mmabatho/i.test(centreText)) city = 'Mahikeng';
+                else if (/Bisho|Bhisho/i.test(centreText)) city = 'Bhisho';
+
+                let province = 'Unknown';
+                if (/Gauteng/i.test(centreText) || /Gauteng/i.test(department)) province = 'Gauteng';
+                else if (/Western Cape/i.test(centreText) || /Western Cape/i.test(department)) province = 'Western Cape';
+                else if (/KwaZulu-Natal|KZN/i.test(centreText) || /KwaZulu-Natal/i.test(department)) province = 'KwaZulu-Natal';
+                else if (/Eastern Cape/i.test(centreText) || /Eastern Cape/i.test(department)) province = 'Eastern Cape';
+                else if (/Limpopo/i.test(centreText) || /Limpopo/i.test(department)) province = 'Limpopo';
+                else if (/Mpumalanga/i.test(centreText) || /Mpumalanga/i.test(department)) province = 'Mpumalanga';
+                else if (/Free State/i.test(centreText) || /Free State/i.test(department)) province = 'Free State';
+                else if (/North West/i.test(centreText) || /North West/i.test(department)) province = 'North West';
+                else if (/Northern Cape/i.test(centreText) || /Northern Cape/i.test(department)) province = 'Northern Cape';
+
+                let minAmount: number | undefined;
+                let maxAmount: number | undefined;
+                const salaryNums = salaryText.match(/R\s*([\d\s]+)/g);
+                if (salaryNums && salaryNums.length >= 1) {
+                  const parsed = salaryNums
+                    .map(s => parseInt(s.replace(/[^\d]/g, ''), 10))
+                    .filter(n => !isNaN(n) && n > 1000);
+                  if (parsed.length >= 1) minAmount = parsed[0];
+                  if (parsed.length >= 2) maxAmount = parsed[1];
+                }
+
+                let period: 'Annual' | 'Monthly' | 'Unknown' = 'Unknown';
+                if (/annum|year/i.test(salaryText)) period = 'Annual';
+                else if (/month/i.test(salaryText)) period = 'Monthly';
+
+                let appUrl = pdfUrl;
+                const urlInApp = applications.match(/(https?:\/\/[^\s]+)/i);
+                if (urlInApp) appUrl = urlInApp[1];
+
+                const prov: JobSourceProvenance = {
+                  sourceId: this.sourceId,
+                  sourceName: this.sourceName,
+                  sourceTier: 1,
+                  sourceType: 'GOVERNMENT',
+                  originalListingId: refNo || postNumber,
+                  originalUrl: pdfUrl,
+                  employerName: department,
+                  publicationDate: today,
+                  lastVerifiedDate: today,
+                  lastSeenAt: today,
+                  expiresAt: rawClosingDate || undefined,
+                  sourceStatus: 'LIVE_EXTERNAL',
+                  verificationStatus: 'UNVERIFIED',
+                  destinationStatus: 'LISTING_ONLY',
+                  freshnessStatus: 'NEW',
+                  applicationDestination: appUrl,
+                  isRealVerified: false,
+                  isFixture: false,
+                  isLive: true,
+                  attributionRequired: false,
+                };
+
+                const item: Opportunity = {
+                  id: oppId,
+                  title,
+                  employer: department,
+                  location: {
+                    city,
+                    province,
+                    regionType: 'LOCAL',
+                    country: 'South Africa',
+                    rawLocationText: centreText || undefined,
+                  },
+                  jobCategory: 'Administration & Clerical',
+                  employmentType: 'Unknown',
+                  experienceLevel: 'Unknown',
+                  qualificationRequirement: reqs.length > 0 ? reqs[0] : 'NOT_SPECIFIED',
+                  salary: salaryText
+                    ? {
+                        formatted: salaryText,
+                        period,
+                        minAmount,
+                        maxAmount,
+                        currency: 'ZAR',
+                      }
+                    : undefined,
+                  summary: `${title} at ${department}${centreText ? ' (' + centreText + ')' : ''}`,
+                  fullDescription: `Department: ${department}\nCentre: ${centreText}\nRef No: ${refNo}\n\nRequirements:\n${reqs.join(
+                    '\n'
+                  )}\n\nDuties:\n${duties.join('\n')}\n\nEnquiries: ${enquiries}`,
+                  requirements: reqs,
+                  responsibilities: duties,
+                  skillsRequired: [],
+                  closingDate: rawClosingDate || undefined,
+                  postedAt: today,
+                  updatedAt: today,
+                  sourceProvenance: prov,
+                  isFixture: false,
+                  isLive: true,
+                };
+
+                itemsInPdf.push(item);
+              }
+
+              return itemsInPdf;
+            } catch (pdfErr) {
+              return [];
+            }
+          })
+        );
+
+        for (const pdfItems of batchResults) {
+          allOpportunities.push(...pdfItems);
+        }
+      }
+
+      // Filter by query params if present
+      let filtered = allOpportunities;
+
+      if (params?.city) {
+        const queryCity = params.city.toLowerCase();
+        filtered = filtered.filter(
+          o =>
+            o.location.city.toLowerCase().includes(queryCity) ||
+            (o.location.rawLocationText && o.location.rawLocationText.toLowerCase().includes(queryCity))
+        );
+      }
+
+      if (params?.province) {
+        const queryProv = params.province.toLowerCase();
+        filtered = filtered.filter(
+          o =>
+            o.location.province.toLowerCase().includes(queryProv) ||
+            (o.location.rawLocationText && o.location.rawLocationText.toLowerCase().includes(queryProv))
+        );
+      }
+
+      registry.recordRequest(this.sourceId, true, filtered.length, allOpportunities.length, 0);
+      return filtered;
+    } catch (err: any) {
+      registry.recordRequest(this.sourceId, false, 0, 0, 0);
+      // STRICT NO-FALLBACK: Return [] if live acquisition fails
+      return [];
+    }
   }
 }
 

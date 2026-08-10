@@ -271,7 +271,7 @@ export async function runCareerjetSourceFactTruthAudit(): Promise<{ passed: numb
   assert((await pnet.getStatus()) === 'PARTNERSHIP_REQUIRED', 'TEST 54', 'PNet remains PARTNERSHIP_REQUIRED');
 
   const dpsa = new DpsaPublicVacanciesAdapter();
-  assert((await dpsa.getStatus()) === 'STATIC_FIXTURE', 'TEST 55', 'Tier-1 static data remains STATIC_FIXTURE');
+  assert((await dpsa.getStatus()) === 'LIVE_EXTERNAL', 'TEST 55', 'DPSA status is LIVE_EXTERNAL');
 
   const adzuna = new AdzunaAdapter();
   assert((await adzuna.getStatus()) === 'LIVE_EXTERNAL', 'TEST 56', 'Adzuna behavior is not modified');

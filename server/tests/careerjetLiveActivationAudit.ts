@@ -181,9 +181,9 @@ export async function runCareerjetLiveActivationAudit(): Promise<{ passed: numbe
   const pnet = new PNetAdapter();
   assert((await pnet.getStatus()) === 'PARTNERSHIP_REQUIRED', 'TEST 23', 'PNet status remains PARTNERSHIP_REQUIRED.');
 
-  // TEST 24: Tier-1 fixtures remain STATIC_FIXTURE
+  // TEST 24: DPSA status is LIVE_EXTERNAL
   const dpsa = new DpsaPublicVacanciesAdapter();
-  assert((await dpsa.getStatus()) === 'STATIC_FIXTURE', 'TEST 24', 'DPSA status remains STATIC_FIXTURE.');
+  assert((await dpsa.getStatus()) === 'LIVE_EXTERNAL', 'TEST 24', 'DPSA status is LIVE_EXTERNAL.');
 
   // TEST 25: Adzuna remains unchanged
   const adzuna = new AdzunaAdapter();

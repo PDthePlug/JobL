@@ -37,7 +37,7 @@ export async function runProductionFixtureLockAudit(): Promise<{ passed: number;
     });
   }
 
-  const fixtureAdapterIds = ['dpsa_gov_za', 'labour_gov_za', 'sayouth_mobi', 'cci_sa_careers', 'retail_official_portals'];
+  const fixtureAdapterIds = ['labour_gov_za', 'sayouth_mobi', 'cci_sa_careers', 'retail_official_portals'];
 
   // -------------------------------------------------------------
   // TEST 1 — Production + includeFixtures=true → fixture adapters DO NOT execute
