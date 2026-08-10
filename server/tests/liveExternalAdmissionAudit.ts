@@ -157,7 +157,7 @@ export async function runLiveExternalAdmissionAudit(): Promise<{ passed: number;
       },
     });
     (pipeline as any).adapters = [{
-      sourceId: 'dpsa_gov_za',
+      sourceId: 'labour_gov_za',
       sourceTier: 1 as const,
       getStatus: async () => 'STATIC_FIXTURE' as const,
       fetchOpportunities: async () => [fixtureOpp],

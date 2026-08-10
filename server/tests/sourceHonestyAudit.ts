@@ -84,7 +84,7 @@ export async function runSourceHonestyAudit(): Promise<{ passed: number; failed:
   };
 
   const expectedStatuses: Record<string, SourceAdapterStatus> = {
-    dpsa_gov_za: 'STATIC_FIXTURE',
+    dpsa_gov_za: 'LIVE_EXTERNAL',
     labour_gov_za: 'STATIC_FIXTURE',
     sayouth_mobi: 'STATIC_FIXTURE',
     cci_sa_careers: 'STATIC_FIXTURE',
@@ -128,7 +128,6 @@ export async function runSourceHonestyAudit(): Promise<{ passed: number; failed:
   // -------------------------------------------------------------
   log('\n--- TEST 3: FIXTURE PROVENANCE ---');
   const fixtureAdapters = [
-    adaptersMap.dpsa_gov_za,
     adaptersMap.labour_gov_za,
     adaptersMap.sayouth_mobi,
     adaptersMap.cci_sa_careers,

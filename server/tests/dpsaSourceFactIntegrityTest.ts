@@ -239,6 +239,32 @@ async function runLiveAuditAndRegressions() {
 
   const adapter = new DpsaPublicVacanciesAdapter();
   const startTime = Date.now();
+  let totalRawBlocks = 0;
+  let totalMetrics = {
+    totalParsed: 0,
+    validCount: 0,
+    rejectedCount: 0,
+    needsReviewCount: 0,
+    duplicateCount: 0,
+    missingTitleCount: 0,
+    missingDeptCount: 0,
+    missingRefNoCount: 0,
+    missingSalaryCount: 0,
+    missingLocationCount: 0,
+    missingClosingDateCount: 0,
+  };
+  
+  // Hack to grab metrics for report:
+  const oldParse = (adapter as any).fetchOpportunities;
+  const opps: any[] = [];
+  try {
+    const registry = (global as any).SourceRegistry || require('../adapters/sourceRegistry.ts').SourceRegistry;
+    const { parseDpsaText } = require('../adapters/sourceAdapters.ts');
+    
+    // We can just rely on the existing fetchOpportunities and then maybe monkey patch parseDpsaText?
+    // Actually the adapter does not expose metrics currently, so we'll just run fetchOpportunities to get the results.
+  } catch(e) {}
+  
   const liveOpps = await adapter.fetchOpportunities();
   const durationMs = Date.now() - startTime;
 

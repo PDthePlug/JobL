@@ -139,9 +139,9 @@ export function parseDpsaText(
 
     // Clean title block: replace newlines/multiple spaces with single space, strip REF NO if present
     let title = titleBlock
-      .replace(/REF NO\s*:.*$/i, '')
-      .replace(/SALARY\s*:.*$/i, '')
-      .replace(/CENTRE\s*:.*$/i, '')
+      .replace(/REF\s*NO[\s\S]*$/i, '')
+      .replace(/SALARY[\s\S]*$/i, '')
+      .replace(/CENTRE[\s\S]*$/i, '')
       .trim()
       .replace(/\s+/g, ' ')
       .replace(/^[:\s]+|[:\s]+$/g, '');
@@ -164,7 +164,7 @@ export function parseDpsaText(
 
     // 5. Reference Number Extraction (strictly within postChunk)
     let refNo = '';
-    const refMatch = postChunk.match(/REF NO\s*:\s*([^\n\r]+)/i);
+    const refMatch = postChunk.match(/REF\s*NO\s*:\s*([^\n\r]+)/i);
     if (refMatch) {
       refNo = refMatch[1].trim().replace(/\s+/g, ' ');
     } else {

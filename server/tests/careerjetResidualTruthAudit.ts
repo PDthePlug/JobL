@@ -298,7 +298,7 @@ export async function runCareerjetResidualTruthAudit(): Promise<{ passed: number
     // TEST 21: STATIC_FIXTURE remains excluded from production
     const fixtureOpp: Opportunity = { ...opps15[0], isFixture: true, sourceProvenance: { ...opps15[0].sourceProvenance, isFixture: true, sourceStatus: 'STATIC_FIXTURE' } };
     (pipeline as any).adapters = [{
-      sourceId: 'dpsa_gov_za',
+      sourceId: 'labour_gov_za',
       sourceTier: 1 as const,
       getStatus: async () => 'STATIC_FIXTURE' as const,
       fetchOpportunities: async () => [fixtureOpp],
