@@ -69,7 +69,7 @@ export class OpportunityPipeline {
         return true;
       }
       
-      if (isFixture && params?.includeFixtures === true) {
+      if (isFixture && !isProduction && params?.includeFixtures === true) {
         return true;
       }
 
