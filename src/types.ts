@@ -214,10 +214,10 @@ export interface ExtractedCVData {
   languages: string[];
   licences: string[];
   references?: ReferenceItem[];
+  rawExtractedText?: string | null;
   otherSections?: OtherCvSection[];
 
   // Lossless Raw Text Preservation
-  rawExtractedText?: string | null;
 }
 
 export interface CandidateCVProfile {

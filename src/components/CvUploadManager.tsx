@@ -85,7 +85,12 @@ export const CvUploadManager: React.FC<CvUploadManagerProps> = ({
           }
 
           setUploadProgress(100);
-          setUploadStatusText('Extraction complete!');
+          
+          if (data.extractionStatus === 'NEEDS_REVIEW') {
+            setUploadStatusText('We read most of your CV, but some information may need checking.');
+          } else {
+            setUploadStatusText('We\'ve read your CV. Please check the information below.');
+          }
 
           const newExtractedData: ExtractedCVData = data.extractedData;
           setExtractedData(newExtractedData);

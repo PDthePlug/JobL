@@ -1,3 +1,4 @@
+import { detectFileType, extractTextFromBuffer, assessTextQuality } from "./documentParser.js";
 import { GoogleGenAI, Type } from '@google/genai';
 import { Opportunity, CandidateLead, CVAnalysisResult, ExtractedCVData, EmploymentItem, EducationItem, SkillItem, ReferenceItem, CertificationItem, OtherCvSection } from '../../src/types.js';
 
@@ -205,6 +206,8 @@ ${candidate.phone} | ${candidate.email}`,
     }
   }
 
+
+
   /**
    * Extracts structured candidate data directly from an uploaded CV document (PDF, DOC, DOCX, TXT).
    * Extracts ONLY information present in the document.
@@ -217,41 +220,55 @@ ${candidate.phone} | ${candidate.email}`,
   ): Promise<ExtractedCVData> {
     const aiClient = this.getAi();
 
-    // 1. Decode raw text if file is text/plain or readable text
-    let rawText = '';
-    try {
-      const buffer = Buffer.from(fileDataBase64, 'base64');
-      const textCandidate = buffer.toString('utf-8');
-      if (textCandidate.length > 20) {
-        rawText = textCandidate.replace(/\r\n/g, '\n').trim();
-      }
-    } catch {
-      rawText = '';
+    const buffer = Buffer.from(fileDataBase64, 'base64');
+    
+    // 1. Detect actual file type, don't trust extension fully
+    let actualFileType = detectFileType(buffer);
+    if (actualFileType === 'unknown') {
+      // Fallback to extension if magic numbers didn't match anything explicit (e.g. some text files)
+      if (fileName.toLowerCase().endsWith('.pdf')) actualFileType = 'pdf';
+      else if (fileName.toLowerCase().endsWith('.docx')) actualFileType = 'docx';
+      else if (fileName.toLowerCase().endsWith('.doc')) actualFileType = 'doc';
+      else if (fileName.toLowerCase().endsWith('.txt')) actualFileType = 'txt';
+      else if (fileName.toLowerCase().endsWith('.rtf')) actualFileType = 'rtf';
     }
 
-    // Determine MIME type for Gemini inlineData
-    let mimeType = fileType || 'application/pdf';
-    if (fileName.toLowerCase().endsWith('.pdf')) mimeType = 'application/pdf';
-    else if (fileName.toLowerCase().endsWith('.docx')) mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-    else if (fileName.toLowerCase().endsWith('.doc')) mimeType = 'application/msword';
-    else if (fileName.toLowerCase().endsWith('.txt') || fileType.includes('text')) mimeType = 'text/plain';
+    if (actualFileType === 'unknown' || actualFileType === 'rtf') {
+      throw new Error('Unsupported file format. Please upload a PDF, DOCX, or TXT document.');
+    }
+
+    // 2. Format-Specific Document Parser
+    const { text: rawText, isScanned } = await extractTextFromBuffer(buffer, actualFileType);
+
+    // 3. Check for Scanned PDFs
+    if (isScanned) {
+      throw new Error('This looks like a scanned CV. We couldn\'t reliably extract the text. Please upload a text-based PDF or DOCX.');
+    }
+
+    // 4. Raw Text Quality Gate
+    const quality = assessTextQuality(rawText);
+    if (quality === 'EMPTY' || quality === 'CORRUPTED') {
+      throw new Error('We couldn\'t read this CV reliably. The text appears corrupted or empty. Please try a PDF or DOCX version.');
+    }
 
     const systemPrompt = `You are JobL's Lossless CV Extraction Engine.
-Your task is to parse the candidate CV document and extract structured candidate information into JSON format.
+Your task is to parse the candidate CV document text and extract structured candidate information into JSON format.
 
 CRITICAL INSTRUCTIONS & RULES:
-1. Extract ONLY information that explicitly exists in the document.
-2. DO NOT INVENT, FABRICATE, ASSUME, OR GUESS any information (e.g. do NOT invent employers, qualifications, dates, skills, or phone numbers).
+1. Extract ONLY information that explicitly exists in the text.
+2. DO NOT INVENT, FABRICATE, ASSUME, OR GUESS any information.
 3. Preserve ALL bullet points, personal statements, milestones, certifications, and references without omitting details.
-4. If a field is missing or not present in the CV, set it to null or an empty array.
+4. If a field is missing or not present in the CV text, set it to null or an empty array.
 5. If text does not fit standard fields, preserve it in the "otherSections" array so NO content is lost.
 6. Preserve ALL phone numbers found in the CV (as a formatted string in "phone" and array in "phoneNumbers").
 7. Ensure identity number, marital status, gender, dependents, and availability are extracted if present.
 8. Distinguish between responsibilities, achievements, and milestones for employment entries.`;
 
-    const userPrompt = `Extract structured candidate profile details from the candidate CV document (${fileName}).
-If raw document text is provided below, parse it completely:
-${rawText ? `--- DOCUMENT RAW TEXT ---\n${rawText}\n--- END DOCUMENT TEXT ---` : `Parsing file "${fileName}".`}
+    const userPrompt = `Extract structured candidate profile details from the candidate CV text below.
+
+--- DOCUMENT RAW TEXT ---
+${rawText}
+--- END DOCUMENT TEXT ---
 
 Make sure to extract:
 - fullName, firstName, surname
@@ -269,26 +286,14 @@ Make sure to extract:
 - languages (array of strings)
 - licences (array of strings)
 - references (array of { name, titleRelationship, organisation, contactNumber, email })
-- otherSections (array of { title, originalText, items })
-- rawExtractedText (verbatim extracted text from CV)`;
+- otherSections (array of { title, originalText, items })`;
 
     const modelsToTry = ['gemini-3.5-flash', 'gemini-2.0-flash', 'gemini-3.6-flash'];
     let lastError: any = null;
 
     for (const modelName of modelsToTry) {
       try {
-        const contentsPayload: any[] = [];
-        if (mimeType === 'text/plain' && rawText) {
-          contentsPayload.push({ text: userPrompt });
-        } else {
-          contentsPayload.push({
-            inlineData: {
-              mimeType: mimeType,
-              data: fileDataBase64,
-            },
-          });
-          contentsPayload.push({ text: userPrompt });
-        }
+        const contentsPayload: any[] = [{ text: userPrompt }];
 
         const response = await aiClient.models.generateContent({
           model: modelName,

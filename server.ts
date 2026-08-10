@@ -8,6 +8,7 @@ import { CvIntelligenceService } from './server/services/cvIntelligenceService.t
 import { JobRequirementService } from './server/services/jobRequirementService.ts';
 import { ApplicationReadinessService } from './server/services/applicationReadinessService.ts';
 import { ApplicationDocumentService } from './server/services/applicationDocumentService.ts';
+import { validateExtraction } from "./server/services/cvExtractionValidator.js";
 import { AnalyticsService } from './server/services/analyticsService.ts';
 
 const app = express();
@@ -229,15 +230,20 @@ app.post('/api/cv/upload-and-extract', async (req, res) => {
 
     const extractedData = await cvService.extractCvContent(fileDataBase64, fileType, fileName);
 
+    const validation = validateExtraction(extractedData.rawExtractedText || '', extractedData);
+
     analytics.logEvent('cv_extraction_completed', {
       fileName,
+      status: validation.status,
       hasFirstName: Boolean(extractedData.firstName),
       hasEmail: Boolean(extractedData.email),
       hasPhone: Boolean(extractedData.phone),
     });
 
     res.json({
-      success: true,
+      success: validation.status === 'COMPLETE' || validation.status === 'NEEDS_REVIEW',
+      extractionStatus: validation.status,
+      extractionReasons: validation.reasons,
       fileName,
       fileType: fileType || 'application/pdf',
       uploadedAt: new Date().toISOString(),
@@ -247,7 +253,12 @@ app.post('/api/cv/upload-and-extract', async (req, res) => {
     analytics.logEvent('cv_extraction_failed', {
       error: error.message,
     });
-    res.status(500).json({ success: false, error: error.message || 'CV extraction failed.' });
+    const message = error.message || 'CV extraction failed.';
+    let status = 'FAILED';
+    if (message.includes('scanned')) status = 'OCR_REQUIRED';
+    else if (message.includes('Unsupported file format')) status = 'UNSUPPORTED_FORMAT';
+    
+    res.status(400).json({ success: false, error: message, extractionStatus: status });
   }
 });
 
