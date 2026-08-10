@@ -4,6 +4,7 @@ import {
   SourceTier,
   SourceType,
   JobSourceProvenance,
+  FreshnessStatus,
 } from '../../src/types.ts';
 import { SourceRegistry } from './sourceRegistry.ts';
 
@@ -1159,50 +1160,132 @@ export class CareerjetAdapter implements ISourceAdapter {
 
       for (let idx = 0; idx < data.jobs.length; idx++) {
         const item = data.jobs[idx];
-        if (!item || !item.title || !item.title.trim() || !item.url) {
+        if (!item || !item.title || typeof item.title !== 'string' || !item.title.trim() || !item.url) {
           continue;
         }
 
         const urlHash = Buffer.from(item.url).toString('hex').slice(0, 16);
         const id = `careerjet_${urlHash}`;
-        const rawLoc = item.locations || item.location || (params?.city ? (params.province ? `${params.city}, ${params.province}` : params.city) : 'South Africa');
 
-        let pubDate = today;
-        if (item.date) {
-          try {
-            const parsed = new Date(item.date);
-            if (!isNaN(parsed.getTime())) {
-              pubDate = parsed.toISOString().split('T')[0];
-            }
-          } catch {
-            pubDate = today;
+        // Employer: Use company when present, never manufacture 'Verified Employer'
+        const employer = (item.company && typeof item.company === 'string' && item.company.trim())
+          ? item.company.trim()
+          : 'Unspecified Employer';
+
+        // Description: Excerpt only
+        const summary = (item.description && typeof item.description === 'string')
+          ? item.description.trim()
+          : '';
+        const fullDescription = undefined;
+
+        // Location: Strictly from source, zero search-param contamination
+        const rawLoc = (item.locations && typeof item.locations === 'string' && item.locations.trim())
+          ? item.locations.trim()
+          : (item.location && typeof item.location === 'string' && item.location.trim())
+            ? item.location.trim()
+            : undefined;
+
+        let city = 'Unknown';
+        let province = 'Unknown';
+
+        if (rawLoc) {
+          const parts = rawLoc.split(',').map(s => s.trim()).filter(Boolean);
+          if (parts.length >= 2) {
+            city = parts[0];
+            province = parts[1];
+          } else if (parts.length === 1) {
+            city = parts[0];
+            province = 'Unknown';
           }
+        }
+
+        // Date & Freshness parsing
+        let pubDate: string | undefined = undefined;
+        let freshnessStatus: FreshnessStatus = 'UNKNOWN';
+
+        if (item.date && typeof item.date === 'string') {
+          const parsed = new Date(item.date);
+          if (!isNaN(parsed.getTime())) {
+            pubDate = parsed.toISOString().split('T')[0];
+            const diffDays = (Date.now() - parsed.getTime()) / (1000 * 60 * 60 * 24);
+            if (diffDays >= 0) {
+              if (diffDays <= 3) freshnessStatus = 'NEW';
+              else if (diffDays <= 7) freshnessStatus = 'FRESH';
+              else if (diffDays <= 30) freshnessStatus = 'RECENT';
+              else freshnessStatus = 'STALE';
+            } else {
+              freshnessStatus = 'NEW';
+            }
+          }
+        }
+
+        // Salary parsing
+        let salaryObj: Opportunity['salary'] = undefined;
+        if (item.salary || item.salary_min !== undefined || item.salary_max !== undefined) {
+          const minNum = (item.salary_min !== undefined && item.salary_min !== null && !isNaN(Number(item.salary_min)))
+            ? Number(item.salary_min)
+            : undefined;
+          const maxNum = (item.salary_max !== undefined && item.salary_max !== null && !isNaN(Number(item.salary_max)))
+            ? Number(item.salary_max)
+            : undefined;
+
+          let period: 'Hourly' | 'Monthly' | 'Annual' | 'Stipend' | 'Weekly' | 'Daily' | 'Unknown' = 'Unknown';
+          const st = String(item.salary_type || '').trim().toUpperCase();
+          if (st === 'Y' || st === 'YEAR' || st === 'YEARLY' || st === 'ANNUALLY') {
+            period = 'Annual';
+          } else if (st === 'M' || st === 'MONTH' || st === 'MONTHLY') {
+            period = 'Monthly';
+          } else if (st === 'W' || st === 'WEEK' || st === 'WEEKLY') {
+            period = 'Weekly';
+          } else if (st === 'D' || st === 'DAY' || st === 'DAILY') {
+            period = 'Daily';
+          } else if (st === 'H' || st === 'HOUR' || st === 'HOURLY') {
+            period = 'Hourly';
+          }
+
+          const currency = (item.salary_currency_code && typeof item.salary_currency_code === 'string' && item.salary_currency_code.trim())
+            ? item.salary_currency_code.trim().toUpperCase()
+            : 'ZAR';
+
+          let formatted = '';
+          if (item.salary && typeof item.salary === 'string' && item.salary.trim()) {
+            formatted = item.salary.trim();
+          } else if (minNum !== undefined && maxNum !== undefined) {
+            formatted = `${currency} ${minNum} - ${maxNum}`;
+          } else if (minNum !== undefined) {
+            formatted = `${currency} ${minNum}`;
+          } else if (maxNum !== undefined) {
+            formatted = `${currency} ${maxNum}`;
+          }
+
+          salaryObj = {
+            formatted,
+            period,
+            minAmount: minNum,
+            maxAmount: maxNum,
+            currency,
+          };
         }
 
         const opp: Opportunity = {
           id,
           title: item.title.trim(),
-          employer: item.company && item.company.trim() ? item.company.trim() : 'Unspecified Employer',
+          employer,
           location: {
-            city: rawLoc,
-            province: params?.province || 'South Africa',
-            regionType: 'NATIONAL',
+            rawLocationText: rawLoc,
+            city,
+            province,
+            regionType: 'UNKNOWN',
             country: 'South Africa',
-            remoteStatus: 'NONE',
+            remoteStatus: 'UNKNOWN',
           },
-          jobCategory: params?.category || 'General',
-          employmentType: 'Full-time',
-          experienceLevel: 'Entry level',
+          jobCategory: 'Unclassified',
+          employmentType: 'Unknown',
+          experienceLevel: 'Unknown',
           qualificationRequirement: 'NOT_SPECIFIED',
-          salary: (item.salary || item.salary_min || item.salary_max) ? {
-            formatted: item.salary || `${item.salary_currency_code || 'ZAR'} ${item.salary_min || ''} - ${item.salary_max || ''}`.trim(),
-            period: (item.salary_type === 'year' || item.salary_type === 'annually') ? 'Annual' : (item.salary_type === 'month' || item.salary_type === 'monthly') ? 'Monthly' : (item.salary_type === 'hour' || item.salary_type === 'hourly') ? 'Hourly' : 'Monthly',
-            minAmount: item.salary_min ? Number(item.salary_min) : undefined,
-            maxAmount: item.salary_max ? Number(item.salary_max) : undefined,
-            currency: item.salary_currency_code === 'USD' ? 'USD' : 'ZAR',
-          } : undefined,
-          summary: item.description || '',
-          fullDescription: item.description || '',
+          salary: salaryObj,
+          summary,
+          fullDescription,
           requirements: [],
           responsibilities: [],
           skillsRequired: [],
@@ -1219,18 +1302,18 @@ export class CareerjetAdapter implements ISourceAdapter {
             originalListingId: urlHash,
             originalUrl: item.url,
             sourceListingUrl: item.url,
-            employerName: item.company && item.company.trim() ? item.company.trim() : 'Unspecified Employer',
+            employerName: employer,
             publicationDate: pubDate,
             lastVerifiedDate: today,
             lastSeenAt: today,
             expiresAt: undefined,
             sourceStatus: 'LIVE_EXTERNAL',
-            verificationStatus: 'VERIFIED',
+            verificationStatus: 'UNVERIFIED',
             destinationStatus: 'LISTING_ONLY',
-            freshnessStatus: 'NEW',
+            freshnessStatus,
             applicationDestination: item.url,
             applicationUrl: item.url,
-            isRealVerified: true,
+            isRealVerified: false,
             isFixture: false,
             isLive: true,
             attributionRequired: true,

@@ -4,10 +4,11 @@ export type RegionType =
   | 'NATIONAL'
   | 'REMOTE_SA'
   | 'REMOTE_INT'
-  | 'INTERNATIONAL';
+  | 'INTERNATIONAL'
+  | 'UNKNOWN';
 
 export type VerificationStatus = 'VERIFIED' | 'PENDING' | 'UNVERIFIED' | 'FLAGGED';
-export type FreshnessStatus = 'NEW' | 'FRESH' | 'RECENT' | 'STALE' | 'EXPIRED';
+export type FreshnessStatus = 'NEW' | 'FRESH' | 'RECENT' | 'STALE' | 'EXPIRED' | 'UNKNOWN';
 export type SourceAdapterStatus = 
   | 'LIVE' 
   | 'LIVE_EXTERNAL' 
@@ -47,7 +48,7 @@ export interface JobSourceProvenance {
   originalUrl: string;
   sourceListingUrl?: string;
   employerName: string;
-  publicationDate: string; // ISO date string
+  publicationDate?: string; // ISO date string or undefined if unparseable/missing
   lastVerifiedDate: string; // ISO date string
   lastSeenAt?: string;
   expiresAt?: string;
@@ -70,28 +71,29 @@ export interface Opportunity {
   title: string;
   employer: string;
   location: {
+    rawLocationText?: string;
     city: string;
     province: string;
     suburbOrTownship?: string;
     regionType: RegionType;
     country: string;
-    remoteStatus?: 'ON_SITE' | 'HYBRID' | 'REMOTE_SA' | 'REMOTE_INT' | 'NONE';
+    remoteStatus?: 'ON_SITE' | 'HYBRID' | 'REMOTE_SA' | 'REMOTE_INT' | 'NONE' | 'UNKNOWN';
     relocationStatus?: 'NOT_ALLOWED' | 'ALLOWED' | 'PROVIDED';
     geographicEligibility?: GeographicEligibility;
   };
   jobCategory: string;
-  employmentType: 'Full-time' | 'Part-time' | 'Contract' | 'Learnership' | 'Internship' | 'Temporary' | 'Casual';
-  experienceLevel: 'No experience' | 'Entry level' | 'Some experience' | 'Experienced';
+  employmentType: 'Full-time' | 'Part-time' | 'Contract' | 'Learnership' | 'Internship' | 'Temporary' | 'Casual' | 'Unknown';
+  experienceLevel: 'No experience' | 'Entry level' | 'Some experience' | 'Experienced' | 'Unknown';
   qualificationRequirement: string;
   salary?: {
     formatted: string;
-    period: 'Hourly' | 'Monthly' | 'Annual' | 'Stipend';
+    period: 'Hourly' | 'Monthly' | 'Annual' | 'Stipend' | 'Weekly' | 'Daily' | 'Unknown';
     minAmount?: number;
     maxAmount?: number;
-    currency: 'ZAR' | 'USD';
+    currency: string;
   };
   summary: string;
-  fullDescription: string;
+  fullDescription?: string;
   requirements: string[];
   responsibilities: string[];
   skillsRequired: string[];
