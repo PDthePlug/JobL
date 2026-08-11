@@ -49,6 +49,41 @@ export interface DpsaParseMetrics {
   missingClosingDateCount: number;
 }
 
+function categorizeDpsaVacancy(title: string): string {
+  const t = title.toLowerCase();
+  if (t.includes('admin') || t.includes('clerk') || t.includes('secretary') || t.includes('data captur') || t.includes('typist') || t.includes('receptionist')) {
+    return 'Administration & Clerical';
+  }
+  if (t.includes('supply chain') || t.includes('logistics') || t.includes('warehouse') || t.includes('transport') || t.includes('driver')) {
+    return 'Warehouse & Logistics';
+  }
+  if (t.includes('cleaner') || t.includes('general worker') || t.includes('groundsman') || t.includes('farm worker')) {
+    return 'General Worker';
+  }
+  if (t.includes('customer service') || t.includes('call centre') || t.includes('contact centre')) {
+    return 'Call Centre & Customer Service';
+  }
+  if (t.includes('retail') || t.includes('cashier')) {
+    return 'Retail & Cashier';
+  }
+  if (t.includes('sales') || t.includes('promoter') || t.includes('marketing')) {
+    return 'Sales & Promoter';
+  }
+  return 'Unclassified';
+}
+
+function parseSafeIsoDate(dateString: string | undefined): string | undefined {
+  if (!dateString) return undefined;
+  // DPSA dates are typically "15 August 2026" or "15 August 2026 at 16:00"
+  // Let's strip "at 16:00" or similar time artifacts
+  const cleanStr = dateString.split(/ at | @ /i)[0].trim();
+  const parsed = new Date(cleanStr);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toISOString().split('T')[0];
+  }
+  return undefined;
+}
+
 export function parseDpsaText(
   text: string,
   pdfUrl: string,
@@ -79,8 +114,12 @@ export function parseDpsaText(
   }
 
   // 1. Department Tracking & Inheritance Reset across PDF text
-  const deptRegex = /(?:DEPARTMENT OF [^\n\r]+|PROVINCIAL ADMINISTRATION:[^\n\r]+|GAUTENG DEPARTMENT OF [^\n\r]+|FREE STATE DEPARTMENT OF [^\n\r]+|KWAZULU-NATAL DEPARTMENT OF [^\n\r]+|WESTERN CAPE DEPARTMENT OF [^\n\r]+|EASTERN CAPE DEPARTMENT OF [^\n\r]+|LIMPOPO DEPARTMENT OF [^\n\r]+|MPUMALANGA DEPARTMENT OF [^\n\r]+|NORTH WEST DEPARTMENT OF [^\n\r]+|NORTHERN CAPE DEPARTMENT OF [^\n\r]+)/gi;
-  const deptMatches = [...text.matchAll(deptRegex)];
+  const deptRegex = /^[ \t]*(?:DEPARTMENT OF [^\n\r]+|PROVINCIAL ADMINISTRATION:[^\n\r]+|GAUTENG DEPARTMENT OF [^\n\r]+|FREE STATE DEPARTMENT OF [^\n\r]+|KWAZULU-NATAL DEPARTMENT OF [^\n\r]+|WESTERN CAPE DEPARTMENT OF [^\n\r]+|EASTERN CAPE DEPARTMENT OF [^\n\r]+|LIMPOPO DEPARTMENT OF [^\n\r]+|MPUMALANGA DEPARTMENT OF [^\n\r]+|NORTH WEST DEPARTMENT OF [^\n\r]+|NORTHERN CAPE DEPARTMENT OF [^\n\r]+)[ \t]*$/gim;
+  const rawDeptMatches = [...text.matchAll(deptRegex)];
+  const deptMatches = rawDeptMatches.filter(m => {
+    const s = m[0].trim().toLowerCase();
+    return !s.endsWith('.') && !s.includes('execution of') && !s.includes('in the ') && !s.includes('requirements') && !s.includes('duties') && !s.includes('responsibilities');
+  });
   const deptIndexList = deptMatches.map(m => ({
     index: m.index!,
     name: m[0].trim().replace(/\s+/g, ' '),
@@ -133,7 +172,7 @@ export function parseDpsaText(
     const afterPostText = postChunk.slice(titleStartOffset);
 
     // Stop title at next structural label
-    const titleLabelStopRegex = /(?=\n\s*(?:REF NO|SALARY|CENTRE|REQUIREMENTS|DUTIES|ENQUIRIES|APPLICATIONS|CLOSING DATE)|$)/i;
+    const titleLabelStopRegex = /(?=\n\s*(?:REF\s*NO|SALARY|CENTRE|REQUIREMENTS|DUTIES|ENQUIRIES|APPLICATIONS|CLOSING DATE|CHIEF DIRECTORATE|DIRECTORATE|SUB-DIRECTORATE|COMPONENT|BRANCH|PROGRAMME|SUB-PROGRAMME|NOTE)\s*:?|$)/i;
     const titleStopMatch = afterPostText.match(titleLabelStopRegex);
     let titleBlock = titleStopMatch ? afterPostText.slice(0, titleStopMatch.index) : afterPostText.slice(0, 300);
 
@@ -284,6 +323,7 @@ export function parseDpsaText(
 
     if (seenKeys.has(dedupeKey)) {
       metrics.duplicateCount++;
+      continue; // Quarantine exact duplicates
     }
     seenKeys.add(dedupeKey);
 
@@ -297,10 +337,10 @@ export function parseDpsaText(
       originalListingId: refNo || postNumber,
       originalUrl: pdfUrl,
       employerName: department,
-      publicationDate: today,
+      publicationDate: undefined,
       lastVerifiedDate: today,
       lastSeenAt: today,
-      expiresAt: postClosingDate || undefined,
+      expiresAt: parseSafeIsoDate(postClosingDate),
       sourceStatus: 'LIVE_EXTERNAL',
       verificationStatus: 'UNVERIFIED',
       destinationStatus: 'LISTING_ONLY',
@@ -323,7 +363,7 @@ export function parseDpsaText(
         country: 'South Africa',
         rawLocationText: centreText || undefined,
       },
-      jobCategory: 'Administration & Clerical',
+      jobCategory: categorizeDpsaVacancy(title) as any,
       employmentType: 'Unknown',
       experienceLevel: 'Unknown',
       qualificationRequirement: reqs.length > 0 ? reqs[0] : 'NOT_SPECIFIED',
@@ -344,7 +384,7 @@ export function parseDpsaText(
       responsibilities: duties,
       skillsRequired: [],
       closingDate: postClosingDate || undefined,
-      postedAt: today,
+      postedAt: undefined,
       updatedAt: today,
       sourceProvenance: prov,
       isFixture: false,
@@ -363,6 +403,7 @@ export class DpsaPublicVacanciesAdapter implements ISourceAdapter {
   sourceName = 'DPSA Public Service Vacancies';
   sourceTier: SourceTier = 1;
   sourceType: SourceType = 'GOVERNMENT';
+  latestMetrics?: DpsaParseMetrics;
 
   async getStatus(): Promise<SourceAdapterStatus> {
     return 'LIVE_EXTERNAL';
@@ -426,6 +467,19 @@ export class DpsaPublicVacanciesAdapter implements ISourceAdapter {
       }
 
       const allOpportunities: Opportunity[] = [];
+      const aggregatedMetrics: DpsaParseMetrics = {
+        totalParsed: 0,
+        validCount: 0,
+        rejectedCount: 0,
+        needsReviewCount: 0,
+        duplicateCount: 0,
+        missingTitleCount: 0,
+        missingDeptCount: 0,
+        missingRefNoCount: 0,
+        missingSalaryCount: 0,
+        missingLocationCount: 0,
+        missingClosingDateCount: 0,
+      };
 
       // 4. Download and parse Annexure PDFs in parallel batches of 6
       const batchSize = 6;
@@ -440,27 +494,42 @@ export class DpsaPublicVacanciesAdapter implements ISourceAdapter {
                 },
               });
 
-              if (!pdfRes.ok) return [];
+              if (!pdfRes.ok) return { opportunities: [], metrics: undefined };
 
               const buffer = await pdfRes.arrayBuffer();
               const parsedPdf = await pdfParse(Buffer.from(buffer));
 
-              const { opportunities } = parseDpsaText(parsedPdf.text, pdfUrl, {
+              const { opportunities, metrics } = parseDpsaText(parsedPdf.text, pdfUrl, {
                 num: latestCirc.num,
                 year: latestCirc.year,
               });
 
-              return opportunities;
+              return { opportunities, metrics };
             } catch (pdfErr) {
-              return [];
+              return { opportunities: [], metrics: undefined };
             }
           })
         );
 
-        for (const pdfItems of batchResults) {
-          allOpportunities.push(...pdfItems);
+        for (const res of batchResults) {
+          allOpportunities.push(...res.opportunities);
+          if (res.metrics) {
+            aggregatedMetrics.totalParsed += res.metrics.totalParsed;
+            aggregatedMetrics.validCount += res.metrics.validCount;
+            aggregatedMetrics.rejectedCount += res.metrics.rejectedCount;
+            aggregatedMetrics.needsReviewCount += res.metrics.needsReviewCount;
+            aggregatedMetrics.duplicateCount += res.metrics.duplicateCount;
+            aggregatedMetrics.missingTitleCount += res.metrics.missingTitleCount;
+            aggregatedMetrics.missingDeptCount += res.metrics.missingDeptCount;
+            aggregatedMetrics.missingRefNoCount += res.metrics.missingRefNoCount;
+            aggregatedMetrics.missingSalaryCount += res.metrics.missingSalaryCount;
+            aggregatedMetrics.missingLocationCount += res.metrics.missingLocationCount;
+            aggregatedMetrics.missingClosingDateCount += res.metrics.missingClosingDateCount;
+          }
         }
       }
+
+      this.latestMetrics = aggregatedMetrics;
 
       // Filter by query params if present
       let filtered = allOpportunities;

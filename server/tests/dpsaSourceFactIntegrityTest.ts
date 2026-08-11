@@ -205,7 +205,7 @@ REF NO : DOE/15
 SALARY : R500 000 per annum
 `;
   const res13 = parseDpsaText(text13, 'http://test.com/m.pdf', { num: 28, year: 2026 });
-  assert(res13.opportunities.length === 2, 'Test 13: Parsed 2 records');
+  assert(res13.opportunities.length === 1, 'Test 13: Parsed 1 record (duplicate quarantined)');
   assert(res13.metrics.duplicateCount === 1, 'Test 13: Duplicate detected and counted');
 
   // Test 14: Empty PDF text -> 0 opportunities returned safely
@@ -239,10 +239,12 @@ async function runLiveAuditAndRegressions() {
 
   const adapter = new DpsaPublicVacanciesAdapter();
   const startTime = Date.now();
-  let totalRawBlocks = 0;
-  let totalMetrics = {
-    totalParsed: 0,
-    validCount: 0,
+  const liveOpps = await adapter.fetchOpportunities();
+  const durationMs = Date.now() - startTime;
+  
+  const metrics = adapter.latestMetrics || {
+    totalParsed: liveOpps.length,
+    validCount: liveOpps.length,
     rejectedCount: 0,
     needsReviewCount: 0,
     duplicateCount: 0,
@@ -253,22 +255,21 @@ async function runLiveAuditAndRegressions() {
     missingLocationCount: 0,
     missingClosingDateCount: 0,
   };
-  
-  // Hack to grab metrics for report:
-  const oldParse = (adapter as any).fetchOpportunities;
-  const opps: any[] = [];
-  try {
-    const registry = (global as any).SourceRegistry || require('../adapters/sourceRegistry.ts').SourceRegistry;
-    const { parseDpsaText } = require('../adapters/sourceAdapters.ts');
-    
-    // We can just rely on the existing fetchOpportunities and then maybe monkey patch parseDpsaText?
-    // Actually the adapter does not expose metrics currently, so we'll just run fetchOpportunities to get the results.
-  } catch(e) {}
-  
-  const liveOpps = await adapter.fetchOpportunities();
-  const durationMs = Date.now() - startTime;
 
-  console.log(`Fetched ${liveOpps.length} live opportunities in ${durationMs}ms`);
+  console.log(`Fetched ${liveOpps.length} valid opportunities in ${durationMs}ms`);
+  console.log(`\n--- DPSA PARSER METRICS ---`);
+  console.log(`Total Parsed Blocks: ${metrics.totalParsed}`);
+  console.log(`Valid Records: ${metrics.validCount}`);
+  console.log(`Rejected Records: ${metrics.rejectedCount}`);
+  console.log(`Needs Review: ${metrics.needsReviewCount}`);
+  console.log(`Quarantined Exact Duplicates: ${metrics.duplicateCount}`);
+  console.log(`Missing Titles: ${metrics.missingTitleCount}`);
+  console.log(`Missing Departments: ${metrics.missingDeptCount}`);
+  console.log(`Missing Ref Nos: ${metrics.missingRefNoCount}`);
+  console.log(`Missing Salaries: ${metrics.missingSalaryCount}`);
+  console.log(`Missing Locations: ${metrics.missingLocationCount}`);
+  console.log(`Missing Closing Dates: ${metrics.missingClosingDateCount}`);
+  console.log(`---------------------------\n`);
 
   // Pipeline integration check
   const pipeline = new OpportunityPipeline();
@@ -287,14 +288,41 @@ async function runLiveAuditAndRegressions() {
     console.log(`\nSAMPLE #${idx + 1}:`);
     console.log(`  Title       : ${o.title}`);
     console.log(`  Employer    : ${o.employer}`);
+    console.log(`  Category    : ${o.jobCategory}`);
     console.log(`  Ref No      : ${o.sourceProvenance.originalListingId}`);
     console.log(`  City / Prov : ${o.location.city}, ${o.location.province} (${o.location.rawLocationText || 'N/A'})`);
     console.log(`  Salary      : ${o.salary?.formatted || 'Not specified'}`);
     console.log(`  Closing Date: ${o.closingDate || 'Not specified'}`);
+    console.log(`  ISO Expires : ${o.sourceProvenance.expiresAt || 'Not specified'}`);
     console.log(`  Reqs Count  : ${o.requirements.length}`);
     console.log(`  Duties Count: ${o.responsibilities.length}`);
     console.log(`  PDF URL     : ${o.sourceProvenance.originalUrl}`);
   });
+
+  console.log('\n==================================================');
+  console.log('4. LIVE ANOMALY SCAN');
+  console.log('==================================================');
+
+  let badEmployer = 0;
+  let badTitle = 0;
+
+  liveOpps.forEach(o => {
+    const emp = o.employer.toLowerCase();
+    if (emp.includes('in the') || emp.includes('execution of') || emp.includes('duties') || emp.includes('requirements') || emp.includes('responsibilities')) {
+      badEmployer++;
+    }
+    const tit = o.title.toLowerCase();
+    if (tit.includes('chief directorate:') || tit.includes('directorate:') || tit.includes('requirements:') || tit.includes('duties:') || tit.includes('salary:') || tit.includes('enquiries:')) {
+      badTitle++;
+    }
+  });
+
+  console.log(`Bad Employers (Prose Contamination)   : ${badEmployer}`);
+  console.log(`Bad Titles (Organisational Metadata)  : ${badTitle}`);
+
+  if (badEmployer > 0 || badTitle > 0) {
+    throw new Error('Anomaly Scan Failed: Found parser bleeding in live records');
+  }
 }
 
 async function main() {
