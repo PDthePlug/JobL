@@ -25,6 +25,14 @@ export type SourceAdapterStatus =
 export type SourceTier = 1 | 2 | 3;
 export type SourceType = 'OFFICIAL_EMPLOYER' | 'GOVERNMENT' | 'AUTHORISED_AGGREGATOR' | 'PARTNER' | 'UNVERIFIED';
 export type DestinationStatus = 'VERIFIED' | 'REDIRECTED' | 'LISTING_ONLY' | 'UNAVAILABLE' | 'EXPIRED' | 'FAILED_VERIFICATION';
+export type ApplicationMethodType =
+  | 'DIRECT_URL'
+  | 'SOURCE_LISTING'
+  | 'EMAIL'
+  | 'POSTAL'
+  | 'HAND_DELIVERY'
+  | 'MIXED'
+  | 'UNKNOWN';
 
 export interface AttributionConfig {
   providerName: string;
@@ -64,7 +72,15 @@ export interface JobSourceProvenance {
   isLive: boolean;
   attributionRequired?: boolean;
   attributionConfig?: AttributionConfig;
+  applicationMethodType?: ApplicationMethodType;
+  applicationInstructions?: string;
+  applicationEmail?: string;
 }
+
+export type OpportunitySector =
+  | 'Government & Public Service'
+  | 'Private Sector'
+  | 'Youth & Learnership';
 
 export interface Opportunity {
   id: string;
@@ -82,6 +98,7 @@ export interface Opportunity {
     geographicEligibility?: GeographicEligibility;
   };
   jobCategory: string;
+  sector?: OpportunitySector;
   employmentType: 'Full-time' | 'Part-time' | 'Contract' | 'Learnership' | 'Internship' | 'Temporary' | 'Casual' | 'Unknown';
   experienceLevel: 'No experience' | 'Entry level' | 'Some experience' | 'Experienced' | 'Unknown';
   qualificationRequirement: string;

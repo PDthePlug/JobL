@@ -50,6 +50,7 @@ export async function runFullPhase1DAudit() {
       undefined,
       config.cat,
       undefined,
+      undefined,
       config.intl
     );
     const ids = results.map((r) => r.id);

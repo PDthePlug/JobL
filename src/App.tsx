@@ -27,6 +27,7 @@ export default function App() {
   const [selectedCity, setSelectedCity] = useState('All Locations');
   const [selectedProvince, setSelectedProvince] = useState('All Provinces');
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
+  const [selectedSector, setSelectedSector] = useState('All Sectors');
   const [selectedExperience, setSelectedExperience] = useState('All Experience Levels');
 
   // State Data
@@ -62,6 +63,7 @@ export default function App() {
         city: selectedCity === 'All Locations' ? '' : selectedCity,
         province: selectedProvince === 'All Provinces' ? '' : selectedProvince,
         category: selectedCategory === 'All Categories' ? '' : selectedCategory,
+        sector: selectedSector === 'All Sectors' ? '' : selectedSector,
         experience: selectedExperience === 'All Experience Levels' ? '' : selectedExperience,
       });
 
@@ -120,6 +122,8 @@ export default function App() {
             setSelectedProvince={setSelectedProvince}
             selectedCategory={selectedCategory}
             setSelectedCategory={setSelectedCategory}
+            selectedSector={selectedSector}
+            setSelectedSector={setSelectedSector}
             selectedExperience={selectedExperience}
             setSelectedExperience={setSelectedExperience}
             onSearch={handleSearchSubmit}

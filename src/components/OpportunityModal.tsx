@@ -99,10 +99,14 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
   const prov = opportunity.sourceProvenance;
 
   const isDestinationValid =
-    prov.verificationStatus === 'VERIFIED' &&
-    prov.applicationDestination &&
-    prov.applicationDestination.startsWith('http') &&
-    prov.sourceStatus !== 'DISABLED';
+    (prov.destinationStatus === 'VERIFIED' ||
+      prov.destinationStatus === 'LISTING_ONLY' ||
+      Boolean(prov.applicationInstructions)) &&
+    prov.destinationStatus !== 'FAILED_VERIFICATION' &&
+    prov.destinationStatus !== 'UNAVAILABLE' &&
+    prov.destinationStatus !== 'EXPIRED' &&
+    prov.sourceStatus !== 'DISABLED' &&
+    Boolean(prov.applicationDestination || prov.originalUrl || prov.applicationInstructions);
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
@@ -160,6 +164,19 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
               onAnswerQuestion={handleAnswerQuestion}
               onProceedToApplication={() => onStartApplicationReadiness(opportunity, matchAnalysis?.jobRequirements, matchAnalysis || undefined, readinessAnalysis || undefined, candidateConfirmations)}
             />
+          )}
+
+          {/* LISTING_ONLY Official Vacancy Reassurance Notice */}
+          {prov.destinationStatus === 'LISTING_ONLY' && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center gap-3 text-xs text-blue-900">
+              <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0" />
+              <div>
+                <p className="font-bold text-blue-900">Official Vacancy Listing & Application Instructions Available</p>
+                <p className="mt-0.5 text-blue-800">
+                  This vacancy originates from an official source document ({prov.sourceName}). JobL will prepare your tailored application package and guide you to submit your application via the official application pathway.
+                </p>
+              </div>
+            </div>
           )}
 
           {/* Destination Failure Notice if invalid */}

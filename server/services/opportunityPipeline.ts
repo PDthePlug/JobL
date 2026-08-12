@@ -182,6 +182,7 @@ export class OpportunityPipeline {
     userProvince?: string,
     userCategory?: string,
     userExperience?: string,
+    userSector?: string,
     includeInternational: boolean = false
   ): Opportunity[] {
     const scored = opportunities
@@ -207,6 +208,62 @@ export class OpportunityPipeline {
           return null;
         }
 
+        // 0. Sector Matching
+        let sectorMatch = false;
+        const normSector = userSector && userSector !== 'All Sectors' ? userSector.trim() : '';
+
+        if (!normSector) {
+          sectorMatch = true;
+        } else if (normSector === 'Government & Public Service') {
+          sectorMatch =
+            opp.sector === 'Government & Public Service' ||
+            opp.sourceProvenance.sourceType === 'GOVERNMENT' ||
+            opp.sourceProvenance.sourceId === 'dpsa_gov_za' ||
+            opp.sourceProvenance.sourceId === 'labour_gov_za';
+          if (sectorMatch) {
+            score += 20;
+            matchExplanation.push('Official Government & Public Service Vacancy');
+          }
+        } else if (normSector === 'Private Sector') {
+          sectorMatch =
+            opp.sector === 'Private Sector' ||
+            (opp.sourceProvenance.sourceType !== 'GOVERNMENT' &&
+              opp.sourceProvenance.sourceId !== 'dpsa_gov_za' &&
+              opp.sourceProvenance.sourceId !== 'labour_gov_za');
+          if (sectorMatch) {
+            score += 15;
+            matchExplanation.push('Private Sector Opportunity');
+          }
+        } else if (normSector.includes('Youth') || normSector.includes('Learnership')) {
+          sectorMatch =
+            opp.sector === 'Youth & Learnership' ||
+            opp.sourceProvenance.sourceId === 'sayouth_mobi' ||
+            opp.jobCategory.toLowerCase().includes('learnership') ||
+            opp.jobCategory.toLowerCase().includes('internship') ||
+            opp.employmentType === 'Learnership' ||
+            opp.employmentType === 'Internship';
+          if (sectorMatch) {
+            score += 20;
+            matchExplanation.push('Youth Employment & Learnership Opportunity');
+          }
+        } else if (normSector.includes('Remote')) {
+          sectorMatch =
+            opp.location.regionType === 'REMOTE_SA' ||
+            opp.location.remoteStatus === 'REMOTE_SA' ||
+            opp.location.regionType === 'REMOTE_INT' ||
+            opp.location.remoteStatus === 'REMOTE_INT';
+          if (sectorMatch) {
+            score += 20;
+            matchExplanation.push('Remote Opportunity');
+          }
+        } else {
+          sectorMatch = opp.sector === normSector;
+        }
+
+        if (!sectorMatch) {
+          return null;
+        }
+
         // 1. Location Matching
         const oppCity = opp.location.city.toLowerCase();
         const oppProvince = opp.location.province.toLowerCase();
@@ -229,26 +286,33 @@ export class OpportunityPipeline {
             matchExplanation.push('International / Global Remote Opportunity');
           }
         } else {
-          // Township / City mapping rules (e.g., Soweto -> Johannesburg, Tembisa -> Gauteng/Ekurhuleni)
+          // Township / City mapping rules
           const isSowetoMatch = targetCity === 'soweto' && (oppCity.includes('johannesburg') || oppSub.includes('soweto') || oppCity.includes('soweto') || oppProvince.includes('gauteng'));
-          const isCityMatch = targetCity && (oppCity.includes(targetCity) || targetCity.includes(oppCity) || (oppSub && oppSub.includes(targetCity)));
+          const isCityMatch = Boolean(
+            targetCity &&
+            targetCity !== 'all locations' &&
+            (oppCity.includes(targetCity) ||
+              targetCity.includes(oppCity) ||
+              (oppSub && oppSub.includes(targetCity)) ||
+              (opp.location.rawLocationText && opp.location.rawLocationText.toLowerCase().includes(targetCity)))
+          );
 
           if (isCityMatch || isSowetoMatch) {
             score += 30;
-            matchExplanation.push(`Near you in ${opp.location.city}${opp.location.suburbOrTownship ? ' (' + opp.location.suburbOrTownship + ')' : ''}`);
+            matchExplanation.push(`Located in ${opp.location.city}${opp.location.suburbOrTownship ? ' (' + opp.location.suburbOrTownship + ')' : ''}`);
             locationMatch = true;
           } else if (opp.location.regionType === 'REMOTE_SA' || opp.location.remoteStatus === 'REMOTE_SA') {
             score += 25;
             matchExplanation.push('Nationwide Remote in South Africa');
             locationMatch = true;
           } else if (targetProvince && oppProvince === targetProvince) {
-            score += 15;
-            matchExplanation.push(`Located in your province (${opp.location.province})`);
-            locationMatch = true;
-          } else if (isRemoteInt && isInternationalRequested) {
-            score += 20;
-            matchExplanation.push('International / Global Remote Opportunity');
-            locationMatch = true;
+            if (targetCity && oppCity !== 'unknown' && !isCityMatch) {
+              locationMatch = false;
+            } else {
+              score += 15;
+              matchExplanation.push(`Located in ${opp.location.province}`);
+              locationMatch = true;
+            }
           }
         }
 

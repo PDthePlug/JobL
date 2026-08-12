@@ -1,7 +1,7 @@
 import React from 'react';
-import { MapPin, Search, Briefcase, Award, CheckCircle2 } from 'lucide-react';
+import { MapPin, Search, Briefcase, Award, CheckCircle2, Building2 } from 'lucide-react';
 import { PRIMARY_SA_LOCATIONS, SOUTH_AFRICAN_PROVINCES } from '../data/saLocations';
-import { SA_JOB_CATEGORIES, EXPERIENCE_LEVELS } from '../data/jobCategories';
+import { SA_JOB_CATEGORIES, EXPERIENCE_LEVELS, SA_SECTORS } from '../data/jobCategories';
 
 interface LandingSearchProps {
   selectedCity: string;
@@ -10,6 +10,8 @@ interface LandingSearchProps {
   setSelectedProvince: (province: string) => void;
   selectedCategory: string;
   setSelectedCategory: (category: string) => void;
+  selectedSector: string;
+  setSelectedSector: (sector: string) => void;
   selectedExperience: string;
   setSelectedExperience: (exp: string) => void;
   onSearch: () => void;
@@ -24,6 +26,8 @@ export const LandingSearch: React.FC<LandingSearchProps> = ({
   setSelectedProvince,
   selectedCategory,
   setSelectedCategory,
+  selectedSector,
+  setSelectedSector,
   selectedExperience,
   setSelectedExperience,
   onSearch,
@@ -73,11 +77,30 @@ export const LandingSearch: React.FC<LandingSearchProps> = ({
                   </select>
                 </div>
 
+                {/* Sector / Employer Type Filter */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                    <Building2 className="w-4 h-4 text-blue-500" />
+                    Sector / Opportunity Type
+                  </label>
+                  <select
+                    value={selectedSector}
+                    onChange={(e) => setSelectedSector(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 font-medium rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none"
+                  >
+                    {SA_SECTORS.map((sec) => (
+                      <option key={sec} value={sec}>
+                        {sec}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 {/* Job Category */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
                     <Briefcase className="w-4 h-4 text-blue-500" />
-                    Type of work
+                    Type of work (Category)
                   </label>
                   <select
                     value={selectedCategory}
@@ -94,7 +117,7 @@ export const LandingSearch: React.FC<LandingSearchProps> = ({
                 </div>
 
                 {/* Experience Level */}
-                <div>
+                <div className="sm:col-span-2">
                   <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
                     <Award className="w-4 h-4 text-blue-500" />
                     Experience Level (Optional)

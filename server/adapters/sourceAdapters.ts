@@ -5,6 +5,8 @@ import {
   SourceType,
   JobSourceProvenance,
   FreshnessStatus,
+  DestinationStatus,
+  ApplicationMethodType,
 } from '../../src/types.ts';
 import { SourceRegistry } from './sourceRegistry.ts';
 import pdfParse from 'pdf-parse';
@@ -13,6 +15,7 @@ export interface SourceQueryParams {
   city?: string;
   province?: string;
   category?: string;
+  sector?: string;
   experience?: string;
   keywords?: string;
   page?: number;
@@ -49,19 +52,160 @@ export interface DpsaParseMetrics {
   missingClosingDateCount: number;
 }
 
+export function extractDpsaLocationFromEvidence(
+  centreTextRaw: string,
+  department: string,
+  postChunk: string
+): {
+  rawLocationText?: string;
+  city: string;
+  province: string;
+} {
+  let centreText = (centreTextRaw || '')
+    .replace(/REF\s*NO[\s\S]*$/i, '')
+    .replace(/SALARY[\s\S]*$/i, '')
+    .replace(/\(X\d+\s*Posts?\)/i, '')
+    .trim()
+    .replace(/\s+/g, ' ');
+
+  let province = 'Unknown';
+  const combo = `${centreText} ${department} ${postChunk.slice(0, 400)}`;
+
+  if (/Gauteng|GAUTENG/i.test(combo)) province = 'Gauteng';
+  else if (/Western Cape|WESTERN CAPE/i.test(combo)) province = 'Western Cape';
+  else if (/KwaZulu-Natal|KZN|KWAZULU-NATAL/i.test(combo)) province = 'KwaZulu-Natal';
+  else if (/Eastern Cape|EASTERN CAPE/i.test(combo)) province = 'Eastern Cape';
+  else if (/Limpopo|LIMPOPO/i.test(combo)) province = 'Limpopo';
+  else if (/Mpumalanga|MPUMALANGA/i.test(combo)) province = 'Mpumalanga';
+  else if (/Free State|FREE STATE/i.test(combo)) province = 'Free State';
+  else if (/North West|NORTH WEST/i.test(combo)) province = 'North West';
+  else if (/Northern Cape|NORTHERN CAPE/i.test(combo)) province = 'Northern Cape';
+
+  // Check if multiple distinct centres or regions are listed
+  const isMultipleCentres =
+    (/;|\/|\bor\b/i.test(centreText) && !/and/i.test(centreText)) ||
+    (centreText.includes(',') && /limpopo|mpumalanga|gauteng|durban|pretoria|cape town/i.test(centreText) && /;\s*|\/\s*/.test(centreText));
+
+  let city = 'Unknown';
+
+  if (!isMultipleCentres) {
+    if (/Pretoria|Tshwane|Centurion|Hatfield|Arcadia|Gezina|Soshanguve|Silverton|Mamelodi/i.test(centreText)) {
+      city = 'Pretoria';
+      if (province === 'Unknown') province = 'Gauteng';
+    } else if (/Johannesburg|Joburg|Sandton|Rosebank|Braamfontein|Soweto|Randburg|Roodepoort|Ekurhuleni|Germiston|Kempton Park|Boksburg|Benoni/i.test(centreText)) {
+      if (/Sandton/i.test(centreText)) city = 'Sandton';
+      else if (/Midrand/i.test(centreText)) city = 'Midrand';
+      else if (/Kempton Park/i.test(centreText)) city = 'Kempton Park';
+      else city = 'Johannesburg';
+      if (province === 'Unknown') province = 'Gauteng';
+    } else if (/Midrand/i.test(centreText)) {
+      city = 'Midrand';
+      if (province === 'Unknown') province = 'Gauteng';
+    } else if (/Cape Town|Mowbray|Parow|Goodwood|Khayelitsha|Mitchells Plain|Rondebosch|Claremont|Wynberg|Tygerberg/i.test(centreText)) {
+      city = 'Cape Town';
+      if (province === 'Unknown') province = 'Western Cape';
+    } else if (/Bellville/i.test(centreText)) {
+      city = 'Bellville';
+      if (province === 'Unknown') province = 'Western Cape';
+    } else if (/Durban|Pinetown|Umlazi|Chatsworth|Westville|Umhlanga/i.test(centreText)) {
+      if (/Pinetown/i.test(centreText)) city = 'Pinetown';
+      else city = 'Durban';
+      if (province === 'Unknown') province = 'KwaZulu-Natal';
+    } else if (/Pietermaritzburg/i.test(centreText)) {
+      city = 'Pietermaritzburg';
+      if (province === 'Unknown') province = 'KwaZulu-Natal';
+    } else if (/Bloemfontein/i.test(centreText)) {
+      city = 'Bloemfontein';
+      if (province === 'Unknown') province = 'Free State';
+    } else if (/Polokwane|Pietersburg/i.test(centreText)) {
+      city = 'Polokwane';
+      if (province === 'Unknown') province = 'Limpopo';
+    } else if (/Thohoyandou/i.test(centreText)) {
+      city = 'Thohoyandou';
+      if (province === 'Unknown') province = 'Limpopo';
+    } else if (/Mbombela|Nelspruit/i.test(centreText)) {
+      city = 'Mbombela';
+      if (province === 'Unknown') province = 'Mpumalanga';
+    } else if (/Kimberley/i.test(centreText)) {
+      city = 'Kimberley';
+      if (province === 'Unknown') province = 'Northern Cape';
+    } else if (/Mahikeng|Mafikeng|Mmabatho/i.test(centreText)) {
+      city = 'Mahikeng';
+      if (province === 'Unknown') province = 'North West';
+    } else if (/Bisho|Bhisho/i.test(centreText)) {
+      city = 'Bhisho';
+      if (province === 'Unknown') province = 'Eastern Cape';
+    } else if (/Gqeberha|Port Elizabeth/i.test(centreText)) {
+      city = 'Gqeberha';
+      if (province === 'Unknown') province = 'Eastern Cape';
+    } else if (/East London/i.test(centreText)) {
+      city = 'East London';
+      if (province === 'Unknown') province = 'Eastern Cape';
+    } else if (/Mthatha|Umtata/i.test(centreText)) {
+      city = 'Mthatha';
+      if (province === 'Unknown') province = 'Eastern Cape';
+    } else if (/Rustenburg/i.test(centreText)) {
+      city = 'Rustenburg';
+      if (province === 'Unknown') province = 'North West';
+    } else if (/Upington/i.test(centreText)) {
+      city = 'Upington';
+      if (province === 'Unknown') province = 'Northern Cape';
+    } else if (/Malmesbury/i.test(centreText)) {
+      city = 'Malmesbury';
+      if (province === 'Unknown') province = 'Western Cape';
+    } else if (/George/i.test(centreText)) {
+      city = 'George';
+      if (province === 'Unknown') province = 'Western Cape';
+    } else if (/Paarl/i.test(centreText)) {
+      city = 'Paarl';
+      if (province === 'Unknown') province = 'Western Cape';
+    } else if (/Worcester/i.test(centreText)) {
+      city = 'Worcester';
+      if (province === 'Unknown') province = 'Western Cape';
+    }
+  }
+
+  return {
+    rawLocationText: centreText || undefined,
+    city,
+    province,
+  };
+}
+
 function categorizeDpsaVacancy(title: string): string {
   const t = title.toLowerCase();
-  if (t.includes('admin') || t.includes('clerk') || t.includes('secretary') || t.includes('data captur') || t.includes('typist') || t.includes('receptionist')) {
+  if (t.includes('admin') || t.includes('clerk') || t.includes('secretary') || t.includes('data captur') || t.includes('typist') || t.includes('receptionist') || t.includes('office assistant') || t.includes('personal assistant')) {
     return 'Administration & Clerical';
   }
-  if (t.includes('supply chain') || t.includes('logistics') || t.includes('warehouse') || t.includes('transport') || t.includes('driver')) {
-    return 'Warehouse & Logistics';
+  if (t.includes('nurse') || t.includes('doctor') || t.includes('medical') || t.includes('health') || t.includes('radiograph') || t.includes('pharmacist') || t.includes('dental') || t.includes('caregiver') || t.includes('paramedic') || t.includes('clinical') || t.includes('therapy') || t.includes('therapist')) {
+    return 'Healthcare & Caregiver';
   }
-  if (t.includes('cleaner') || t.includes('general worker') || t.includes('groundsman') || t.includes('farm worker')) {
+  if (t.includes('cleaner') || t.includes('general worker') || t.includes('groundsman') || t.includes('farm worker') || t.includes('handyman') || t.includes('laundry') || t.includes('food service worker') || t.includes('household')) {
     return 'General Worker';
   }
-  if (t.includes('customer service') || t.includes('call centre') || t.includes('contact centre')) {
+  if (t.includes('clean') || t.includes('domestic') || t.includes('housekeeper')) {
+    return 'Cleaner & Domestic';
+  }
+  if (t.includes('supply chain') || t.includes('logistics') || t.includes('warehouse') || t.includes('transport') || t.includes('storeman') || t.includes('inventory')) {
+    return 'Warehouse & Logistics';
+  }
+  if (t.includes('driver') || t.includes('chauffeur') || t.includes('operator')) {
+    return 'Driver & Delivery';
+  }
+  if (t.includes('security') || t.includes('safety') || t.includes('police') || t.includes('traffic officer') || t.includes('constable') || t.includes('guard')) {
+    return 'Security & Safety';
+  }
+  if (t.includes('customer service') || t.includes('call centre') || t.includes('contact centre') || t.includes('enquiries')) {
     return 'Call Centre & Customer Service';
+  }
+  if (t.includes('it') || t.includes('developer') || t.includes('systems') || t.includes('analyst') || t.includes('network') || t.includes('technician') || t.includes('programmer') || t.includes('software')) {
+    return 'IT & Digital Skills';
+  }
+  if (t.includes('chef') || t.includes('cook') || t.includes('catering') || t.includes('food')) {
+    return 'Hospitality & Catering';
+  }
+  if (t.includes('artisan') || t.includes('plumber') || t.includes('electrician') || t.includes('carpenter') || t.includes('boiler') || t.includes('fitter') || t.includes('turner') || t.includes('mechanic') || t.includes('construction') || t.includes('artisan assistant')) {
+    return 'Construction & Trades';
   }
   if (t.includes('retail') || t.includes('cashier')) {
     return 'Retail & Cashier';
@@ -69,7 +213,7 @@ function categorizeDpsaVacancy(title: string): string {
   if (t.includes('sales') || t.includes('promoter') || t.includes('marketing')) {
     return 'Sales & Promoter';
   }
-  return 'Unclassified';
+  return 'Skilled & Professional';
 }
 
 function parseSafeIsoDate(dateString: string | undefined): string | undefined {
@@ -238,7 +382,7 @@ export function parseDpsaText(
       else if (/month/i.test(salaryText)) period = 'Monthly';
     }
 
-    // 7. Centre / Location Extraction (strictly within postChunk)
+    // 7. Centre / Location Extraction (strictly within postChunk & official source context)
     let centreText = '';
     const centreMatch = postChunk.match(/CENTRE\s*:\s*([^\n\r]+)/i);
     if (centreMatch) {
@@ -247,29 +391,10 @@ export function parseDpsaText(
       metrics.missingLocationCount++;
     }
 
-    let city = 'Unknown';
-    if (/Pretoria/i.test(centreText)) city = 'Pretoria';
-    else if (/Johannesburg/i.test(centreText)) city = 'Johannesburg';
-    else if (/Cape Town/i.test(centreText)) city = 'Cape Town';
-    else if (/Durban/i.test(centreText)) city = 'Durban';
-    else if (/Bloemfontein/i.test(centreText)) city = 'Bloemfontein';
-    else if (/Polokwane/i.test(centreText)) city = 'Polokwane';
-    else if (/Nelspruit|Mbombela/i.test(centreText)) city = 'Mbombela';
-    else if (/Pietermaritzburg/i.test(centreText)) city = 'Pietermaritzburg';
-    else if (/Kimberley/i.test(centreText)) city = 'Kimberley';
-    else if (/Mahikeng|Mmabatho/i.test(centreText)) city = 'Mahikeng';
-    else if (/Bisho|Bhisho/i.test(centreText)) city = 'Bhisho';
-
-    let province = 'Unknown';
-    if (/Gauteng/i.test(centreText) || /Gauteng/i.test(department)) province = 'Gauteng';
-    else if (/Western Cape/i.test(centreText) || /Western Cape/i.test(department)) province = 'Western Cape';
-    else if (/KwaZulu-Natal|KZN/i.test(centreText) || /KwaZulu-Natal/i.test(department)) province = 'KwaZulu-Natal';
-    else if (/Eastern Cape/i.test(centreText) || /Eastern Cape/i.test(department)) province = 'Eastern Cape';
-    else if (/Limpopo/i.test(centreText) || /Limpopo/i.test(department)) province = 'Limpopo';
-    else if (/Mpumalanga/i.test(centreText) || /Mpumalanga/i.test(department)) province = 'Mpumalanga';
-    else if (/Free State/i.test(centreText) || /Free State/i.test(department)) province = 'Free State';
-    else if (/North West/i.test(centreText) || /North West/i.test(department)) province = 'North West';
-    else if (/Northern Cape/i.test(centreText) || /Northern Cape/i.test(department)) province = 'Northern Cape';
+    const locParsed = extractDpsaLocationFromEvidence(centreText, department, postChunk);
+    const city = locParsed.city;
+    const province = locParsed.province;
+    const rawLocationText = locParsed.rawLocationText;
 
     // 8. Requirements & Duties Section Boundaries
     let reqs: string[] = [];
@@ -294,12 +419,14 @@ export function parseDpsaText(
 
     // 9. Enquiries & Applications
     let enquiries = '';
-    const enqMatch = postChunk.match(/ENQUIRIES\s*:\s*([^\n\r]+)/i);
+    const enqMatch = postChunk.match(/ENQUIRIES\s*:\s*([\s\S]*?)(?=\n\s*(?:APPLICATIONS|CLOSING DATE|NOTE|DUTIES|REQUIREMENTS|POST\s+\d+|DEPARTMENT OF|CHIEF DIRECTORATE|DIRECTORATE|SUB-DIRECTORATE|COMPONENT|BRANCH|PROGRAMME|SUB-PROGRAMME)\s*:?|$)/i);
     if (enqMatch) enquiries = enqMatch[1].trim().replace(/\s+/g, ' ');
 
     let applications = '';
-    const appMatch = postChunk.match(/APPLICATIONS\s*:\s*([^\n\r]+)/i);
-    if (appMatch) applications = appMatch[1].trim().replace(/\s+/g, ' ');
+    const appMatch = postChunk.match(/APPLICATIONS\s*:\s*([\s\S]*?)(?=\n\s*(?:CLOSING DATE|NOTE|ENQUIRIES|DUTIES|REQUIREMENTS|POST\s+\d+|DEPARTMENT OF|CHIEF DIRECTORATE|DIRECTORATE|SUB-DIRECTORATE|COMPONENT|BRANCH|PROGRAMME|SUB-PROGRAMME)\s*:?|$)/i);
+    if (appMatch) {
+      applications = appMatch[1].trim().replace(/\s+/g, ' ');
+    }
 
     // 10. Post-specific or Circular Closing Date
     let postClosingDate = rawClosingDate;
@@ -312,9 +439,48 @@ export function parseDpsaText(
       metrics.missingClosingDateCount++;
     }
 
+    // Classify DPSA Application Method & Destination
+    let applicationMethodType: ApplicationMethodType = 'SOURCE_LISTING';
+    let applicationEmail: string | undefined = undefined;
     let appUrl = pdfUrl;
-    const urlInApp = applications.match(/(https?:\/\/[^\s]+)/i);
-    if (urlInApp) appUrl = urlInApp[1];
+    let destStatus: DestinationStatus = 'LISTING_ONLY';
+
+    if (applications) {
+      const urlMatch = applications.match(/(https?:\/\/[^\s\)\],]+)/i);
+      const emailMatch = applications.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
+      const isPostal = /postal|post to|private bag|p\.?\s*o\.?\s*box/i.test(applications);
+      const isHand = /hand deliver|physical address|walk-in|reception/i.test(applications);
+
+      if (emailMatch) {
+        applicationEmail = emailMatch[1];
+      }
+
+      if (urlMatch) {
+        const foundUrl = urlMatch[1];
+        if (!foundUrl.match(/^https?:\/\/www\.dpsa\.gov\.za\/?$/i)) {
+          appUrl = foundUrl;
+          destStatus = 'VERIFIED';
+        }
+      }
+
+      const hasUrl = Boolean(urlMatch && destStatus === 'VERIFIED');
+      const hasEmail = Boolean(emailMatch);
+      const channelCount = [hasUrl, hasEmail, isPostal, isHand].filter(Boolean).length;
+
+      if (channelCount > 1) {
+        applicationMethodType = 'MIXED';
+      } else if (hasUrl) {
+        applicationMethodType = 'DIRECT_URL';
+      } else if (hasEmail) {
+        applicationMethodType = 'EMAIL';
+      } else if (isPostal) {
+        applicationMethodType = 'POSTAL';
+      } else if (isHand) {
+        applicationMethodType = 'HAND_DELIVERY';
+      } else {
+        applicationMethodType = 'SOURCE_LISTING';
+      }
+    }
 
     // Duplicate detection key
     const dedupeKey = refNo
@@ -342,11 +508,14 @@ export function parseDpsaText(
       lastSeenAt: today,
       expiresAt: parseSafeIsoDate(postClosingDate),
       sourceStatus: 'LIVE_EXTERNAL',
-      verificationStatus: 'UNVERIFIED',
-      destinationStatus: 'LISTING_ONLY',
+      verificationStatus: destStatus === 'VERIFIED' ? 'VERIFIED' : 'UNVERIFIED',
+      destinationStatus: destStatus,
       freshnessStatus: 'NEW',
       applicationDestination: appUrl,
-      isRealVerified: false,
+      applicationMethodType,
+      applicationInstructions: applications || undefined,
+      applicationEmail,
+      isRealVerified: true,
       isFixture: false,
       isLive: true,
       attributionRequired: false,
@@ -356,12 +525,13 @@ export function parseDpsaText(
       id: oppId,
       title,
       employer: department,
+      sector: 'Government & Public Service',
       location: {
         city,
         province,
         regionType: 'LOCAL',
         country: 'South Africa',
-        rawLocationText: centreText || undefined,
+        rawLocationText: rawLocationText || centreText || undefined,
       },
       jobCategory: categorizeDpsaVacancy(title) as any,
       employmentType: 'Unknown',
@@ -417,7 +587,7 @@ export class DpsaPublicVacanciesAdapter implements ISourceAdapter {
       const indexUrl = 'https://www.dpsa.gov.za/newsroom/psvc/';
       const indexRes = await fetch(indexUrl, {
         headers: {
-          'User-Agent': 'JobL-TruthConsolidation-Engine/1.0 (+https://jobl.co.za)',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         },
       });
 
@@ -447,7 +617,7 @@ export class DpsaPublicVacanciesAdapter implements ISourceAdapter {
       // 3. Fetch latest circular page to discover annexure PDF links
       const detailRes = await fetch(latestCirc.url, {
         headers: {
-          'User-Agent': 'JobL-TruthConsolidation-Engine/1.0 (+https://jobl.co.za)',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         },
       });
 
@@ -490,7 +660,7 @@ export class DpsaPublicVacanciesAdapter implements ISourceAdapter {
             try {
               const pdfRes = await fetch(pdfUrl, {
                 headers: {
-                  'User-Agent': 'JobL-TruthConsolidation-Engine/1.0 (+https://jobl.co.za)',
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 },
               });
 
@@ -555,6 +725,7 @@ export class DpsaPublicVacanciesAdapter implements ISourceAdapter {
       registry.recordRequest(this.sourceId, true, filtered.length, allOpportunities.length, 0);
       return filtered;
     } catch (err: any) {
+      console.error('DPSA fetch error:', err.message);
       registry.recordRequest(this.sourceId, false, 0, 0, 0);
       // STRICT NO-FALLBACK: Return [] if live acquisition fails
       return [];
@@ -583,6 +754,7 @@ export class DelLabourVacanciesAdapter implements ISourceAdapter {
       id: 'del_2026_08_02',
       title: 'General Support Worker / Grounds Assistant',
       employer: 'Department of Employment and Labour',
+      sector: 'Government & Public Service',
       location: {
         city: 'Johannesburg',
         province: 'Gauteng',
@@ -671,6 +843,7 @@ export class SayouthMobiAdapter implements ISourceAdapter {
       id: 'sayouth_2026_08_03',
       title: 'Warehouse & Stock Assistant (YES 12-Month Internship)',
       employer: 'Imperial Logistics / YES Youth Network',
+      sector: 'Youth & Learnership',
       location: {
         city: 'Soweto',
         province: 'Gauteng',

@@ -761,20 +761,64 @@ export const ApplicationReadinessFlow: React.FC<ApplicationReadinessFlowProps> =
               </ul>
             </div>
 
-            {/* Final External Handoff Action */}
+            {/* Final External Handoff & Application Instructions */}
             <div className="pt-2 bg-amber-50 border border-amber-200 p-4 rounded-xl space-y-3">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-amber-950">Next Step: Apply at Employer Portal</span>
-                <span className="text-amber-800 font-mono text-[10px]">Verified Destination</span>
+                <span className="font-bold text-amber-950">
+                  {opportunity.sourceProvenance.destinationStatus === 'VERIFIED'
+                    ? 'Next Step: Apply at Employer Portal'
+                    : opportunity.sourceProvenance.applicationMethodType === 'EMAIL'
+                    ? 'Next Step: Submit Application via Official Email'
+                    : opportunity.sourceProvenance.applicationMethodType === 'POSTAL'
+                    ? 'Next Step: Postal Application Submission'
+                    : opportunity.sourceProvenance.applicationMethodType === 'HAND_DELIVERY'
+                    ? 'Next Step: Hand Delivery Application Submission'
+                    : 'Next Step: Official Application Instructions'}
+                </span>
+                <span className="text-amber-800 font-mono text-[10px] font-bold">
+                  {opportunity.sourceProvenance.destinationStatus === 'VERIFIED' ? 'Verified Destination' : 'Official Vacancy Source'}
+                </span>
               </div>
+
+              {/* Source-grounded Application Instructions */}
+              {opportunity.sourceProvenance.applicationInstructions && (
+                <div className="bg-amber-100/80 border border-amber-300 rounded-lg p-3 text-xs text-slate-900 space-y-1">
+                  <p className="font-bold text-amber-950">Official Application Instructions ({opportunity.employer}):</p>
+                  <p className="leading-relaxed whitespace-pre-wrap">{opportunity.sourceProvenance.applicationInstructions}</p>
+                </div>
+              )}
+
+              {/* Email Address highlight if email method */}
+              {opportunity.sourceProvenance.applicationEmail && (
+                <div className="bg-white border border-amber-300 rounded-lg p-3 flex items-center justify-between text-xs">
+                  <div>
+                    <span className="text-slate-500 block text-[10px]">Official Submission Email:</span>
+                    <span className="font-mono font-bold text-slate-900">{opportunity.sourceProvenance.applicationEmail}</span>
+                  </div>
+                  <a
+                    href={`mailto:${opportunity.sourceProvenance.applicationEmail}?subject=Application for ${encodeURIComponent(opportunity.title)}`}
+                    className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs transition-colors"
+                  >
+                    Open Email App
+                  </a>
+                </div>
+              )}
+
               <p className="text-xs text-amber-900">
-                Your application package is complete! Click below to open <strong>{opportunity.employer}</strong>'s official portal and paste your tailored information to submit.
+                {opportunity.sourceProvenance.destinationStatus === 'VERIFIED'
+                  ? `Your application package is complete! Click below to open ${opportunity.employer}'s official portal and paste your tailored information to submit.`
+                  : `Your application package is complete! Click below to view ${opportunity.employer}'s official vacancy circular and guidelines to finalize your submission.`}
               </p>
+
               <button
                 onClick={handleExternalHandoff}
                 className="w-full bg-slate-900 hover:bg-slate-800 text-amber-400 font-bold py-3 px-6 rounded-xl text-sm transition-all shadow-lg flex items-center justify-center space-x-2 cursor-pointer"
               >
-                <span>APPLY NOW AT {opportunity.employer.toUpperCase()}</span>
+                <span>
+                  {opportunity.sourceProvenance.destinationStatus === 'VERIFIED'
+                    ? `APPLY NOW AT ${opportunity.employer.toUpperCase()}`
+                    : `VIEW OFFICIAL VACANCY DOCUMENT / INSTRUCTIONS`}
+                </span>
                 <ExternalLink className="w-4 h-4 text-amber-400" />
               </button>
             </div>

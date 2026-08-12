@@ -207,6 +207,7 @@ export class GeographicIntegrityAuditSuite {
       query.province,
       query.category,
       undefined,
+      undefined,
       query.includeInternational
     );
 

@@ -24,3 +24,11 @@ export const EXPERIENCE_LEVELS = [
   'Some experience',
   'Experienced',
 ] as const;
+
+export const SA_SECTORS = [
+  'All Sectors',
+  'Government & Public Service',
+  'Private Sector',
+  'Youth & Learnership',
+] as const;
+

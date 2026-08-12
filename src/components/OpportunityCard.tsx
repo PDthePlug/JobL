@@ -1,6 +1,6 @@
 import React from 'react';
 import { Opportunity } from '../types';
-import { MapPin, Building2, Calendar, Award, CheckCircle2, ChevronRight, ShieldCheck, DollarSign } from 'lucide-react';
+import { MapPin, Building2, Calendar, Award, CheckCircle2, ChevronRight, ShieldCheck, DollarSign, Landmark } from 'lucide-react';
 
 interface OpportunityCardProps {
   opportunity: Opportunity;
@@ -9,6 +9,7 @@ interface OpportunityCardProps {
 
 export const OpportunityCard: React.FC<OpportunityCardProps> = ({ opportunity, onSelect }) => {
   const isVerified = opportunity.sourceProvenance.verificationStatus === 'VERIFIED';
+  const sectorName = opportunity.sector || (opportunity.sourceProvenance.sourceType === 'GOVERNMENT' ? 'Government & Public Service' : undefined);
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-200 p-5 flex flex-col justify-between group">
@@ -31,6 +32,13 @@ export const OpportunityCard: React.FC<OpportunityCardProps> = ({ opportunity, o
 
         {/* Location & Employment Type Chips */}
         <div className="flex flex-wrap items-center gap-2 mb-3 text-xs">
+          {sectorName && (
+            <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md bg-amber-50 text-amber-900 font-bold border border-amber-200">
+              <Landmark className="w-3 h-3 text-amber-700" />
+              <span>{sectorName}</span>
+            </span>
+          )}
+
           <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md bg-slate-100 text-slate-800 font-semibold border border-slate-200">
             <MapPin className="w-3 h-3 text-slate-600" />
             <span>

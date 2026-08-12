@@ -33,12 +33,13 @@ analytics.logEvent('landing_page_view', { platform: 'web', initial: true });
 // 1. Search Opportunities API
 app.get('/api/opportunities/search', async (req, res) => {
   try {
-    const { city, province, category, experience, keywords, page } = req.query;
+    const { city, province, category, sector, experience, keywords, page } = req.query;
 
     analytics.logEvent('search_started', {
       city: (city as string) || 'All',
       province: (province as string) || 'All',
       category: (category as string) || 'All',
+      sector: (sector as string) || 'All',
       experience: (experience as string) || 'All',
     });
 
@@ -52,6 +53,7 @@ app.get('/api/opportunities/search', async (req, res) => {
       city: city as string,
       province: province as string,
       category: category as string,
+      sector: sector as string,
       experience: experience as string,
       keywords: keywords as string,
       page: page ? parseInt(page as string, 10) : 1,
@@ -65,7 +67,8 @@ app.get('/api/opportunities/search', async (req, res) => {
       city as string,
       province as string,
       category as string,
-      experience as string
+      experience as string,
+      sector as string
     );
 
     res.json({
