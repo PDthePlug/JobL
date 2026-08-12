@@ -1,1 +1,118 @@
 @import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════
+   JobL Design System — Phase 1
+   Calm, premium, Apple / Notion inspired
+   ═══════════════════════════════════════════════════════════ */
+
+@theme {
+  /* Brand */
+  --color-brand: #1d4ed8;          /* blue-700 — primary actions */
+  --color-brand-hover: #1e40af;    /* blue-800 */
+  --color-brand-soft: #eff6ff;     /* blue-50 */
+  --color-brand-muted: #dbeafe;    /* blue-100 */
+
+  /* Neutrals — slightly warmer than pure slate for calm */
+  --color-ink: #0f172a;            /* near-black for primary text */
+  --color-ink-secondary: #475569;  /* slate-600 */
+  --color-ink-tertiary: #94a3b8;   /* slate-400 */
+  --color-surface: #ffffff;
+  --color-surface-secondary: #f8fafc; /* slate-50 */
+  --color-surface-tertiary: #f1f5f9;  /* slate-100 */
+  --color-border: #e2e8f0;         /* slate-200 */
+  --color-border-strong: #cbd5e1;  /* slate-300 */
+
+  /* Semantic */
+  --color-success: #059669;        /* emerald-600 */
+  --color-success-soft: #ecfdf5;
+  --color-warning: #d97706;
+  --color-warning-soft: #fffbeb;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fef2f2;
+
+  /* Radius */
+  --radius-sm: 0.5rem;   /* 8px */
+  --radius-md: 0.75rem;  /* 12px */
+  --radius-lg: 1rem;     /* 16px */
+  --radius-xl: 1.25rem;  /* 20px */
+  --radius-2xl: 1.5rem;  /* 24px */
+
+  /* Shadows — soft, almost invisible */
+  --shadow-soft: 0 1px 2px 0 rgb(0 0 0 / 0.04), 0 1px 3px 0 rgb(0 0 0 / 0.06);
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 4px 12px -2px rgb(0 0 0 / 0.06);
+  --shadow-elevated: 0 8px 30px -6px rgb(0 0 0 / 0.1), 0 4px 12px -4px rgb(0 0 0 / 0.06);
+}
+
+/* Base */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--color-surface-secondary);
+  color: var(--color-ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Focus ring — accessible but quiet */
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+/* Selection */
+::selection {
+  background-color: var(--color-brand-muted);
+  color: var(--color-ink);
+}
+
+/* Utility helpers used across the redesign */
+@layer utilities {
+  .text-ink { color: var(--color-ink); }
+  .text-ink-secondary { color: var(--color-ink-secondary); }
+  .text-ink-tertiary { color: var(--color-ink-tertiary); }
+
+  .bg-surface { background-color: var(--color-surface); }
+  .bg-surface-secondary { background-color: var(--color-surface-secondary); }
+  .bg-surface-tertiary { background-color: var(--color-surface-tertiary); }
+
+  .border-subtle { border-color: var(--color-border); }
+  .border-strong { border-color: var(--color-border-strong); }
+
+  .shadow-soft { box-shadow: var(--shadow-soft); }
+  .shadow-card { box-shadow: var(--shadow-card); }
+  .shadow-elevated { box-shadow: var(--shadow-elevated); }
+
+  .radius-sm { border-radius: var(--radius-sm); }
+  .radius-md { border-radius: var(--radius-md); }
+  .radius-lg { border-radius: var(--radius-lg); }
+  .radius-xl { border-radius: var(--radius-xl); }
+  .radius-2xl { border-radius: var(--radius-2xl); }
+}
+
+
+/* Mobile / safe area */
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Prevent horizontal overflow on small screens */
+html, body {
+  overflow-x: hidden;
+}
+
+/* Comfortable tap targets on iOS */
+@media (pointer: coarse) {
+  button, a, [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
+}

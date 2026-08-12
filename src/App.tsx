@@ -8,7 +8,7 @@ import { MyApplications } from './components/MyApplications';
 import { OperatorDashboard } from './components/OperatorDashboard';
 import { CvUploadManager } from './components/CvUploadManager';
 import { Opportunity, ApplicationPackage, CandidateCVProfile, JobRequirements, JobMatchAnalysis, ApplicationReadinessAnalysis } from './types';
-import { RefreshCw, SearchX, Briefcase, Sparkles, MapPin, ShieldCheck } from 'lucide-react';
+import { RefreshCw, SearchX } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'search' | 'cv' | 'applications' | 'operator'>('search');
@@ -132,28 +132,28 @@ export default function App() {
           />
 
           {/* Results Section */}
-          <div id="job-results" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 scroll-mt-20">
-            <div className="flex items-center justify-between mb-6">
+          <div id="job-results" className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-12 scroll-mt-20">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 sm:mb-8">
               <div>
-                <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                  <Briefcase className="w-5 h-5 text-blue-600" />
-                  Verified Opportunities Near You
+                <h2 className="text-lg sm:text-xl font-semibold text-slate-900 tracking-tight">
+                  Opportunities near you
                 </h2>
-                <p className="text-xs text-slate-600 mt-0.5">
-                  Showing real vacancies matched to your location and work preferences.
+                <p className="text-sm text-slate-500 mt-1">
+                  Verified vacancies matched to your filters.
                 </p>
               </div>
 
-              {selectedCity !== 'All Locations' || selectedCategory !== 'All Categories' ? (
+              {selectedCity !== 'All Locations' || selectedCategory !== 'All Categories' || selectedSector !== 'All Sectors' ? (
                 <button
                   onClick={() => {
                     setSelectedCity('All Locations');
                     setSelectedProvince('All Provinces');
                     setSelectedCategory('All Categories');
+                    setSelectedSector('All Sectors');
                     setSelectedExperience('All Experience Levels');
                     fetchOpportunities();
                   }}
-                  className="text-xs text-blue-700 hover:text-blue-800 font-semibold underline cursor-pointer"
+                  className="text-sm text-slate-500 hover:text-slate-800 font-medium cursor-pointer"
                 >
                   Clear Filters
                 </button>
@@ -162,9 +162,9 @@ export default function App() {
 
             {/* Error State */}
             {searchError && (
-              <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-xl text-xs mb-6 flex items-center justify-between">
+              <div className="bg-red-50 border border-red-100 text-red-800 p-4 rounded-xl text-sm mb-6 flex items-center justify-between gap-4">
                 <span>{searchError}</span>
-                <button onClick={fetchOpportunities} className="font-bold underline cursor-pointer">
+                <button onClick={fetchOpportunities} className="font-medium text-red-700 hover:text-red-900 cursor-pointer shrink-0">
                   Retry
                 </button>
               </div>
@@ -172,34 +172,39 @@ export default function App() {
 
             {/* Loading Grid */}
             {isLoading ? (
-              <div className="py-16 text-center space-y-3">
-                <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mx-auto" />
-                <p className="text-sm font-semibold text-slate-700">Searching verified South African opportunities...</p>
+              <div className="py-20 text-center space-y-4">
+                <RefreshCw className="w-6 h-6 text-slate-400 animate-spin mx-auto" />
+                <p className="text-sm text-slate-500">Searching verified opportunities…</p>
               </div>
             ) : opportunities.length === 0 ? (
               /* Empty State */
-              <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center max-w-lg mx-auto shadow-sm space-y-3">
-                <SearchX className="w-10 h-10 text-slate-400 mx-auto" />
-                <h3 className="text-base font-bold text-slate-900">No qualifying opportunities found</h3>
-                <p className="text-xs text-slate-600">
-                  Try adjusting your location or selecting 'All Categories' to explore available roles across South Africa.
-                </p>
+              <div className="bg-white rounded-2xl border border-slate-200 p-12 sm:p-16 text-center max-w-md mx-auto space-y-4">
+                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto">
+                  <SearchX className="w-5 h-5 text-slate-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-slate-900">No opportunities found</h3>
+                  <p className="text-sm text-slate-500 mt-1.5 leading-relaxed">
+                    Try a broader location or category to see more roles across South Africa.
+                  </p>
+                </div>
                 <button
                   onClick={() => {
                     setSelectedCity('All Locations');
                     setSelectedProvince('All Provinces');
                     setSelectedCategory('All Categories');
+                    setSelectedSector('All Sectors');
                     setSelectedExperience('All Experience Levels');
                     fetchOpportunities();
                   }}
-                  className="bg-blue-600 text-white font-bold text-xs px-4 py-2 rounded-xl cursor-pointer hover:bg-blue-700"
+                  className="inline-flex items-center justify-center bg-slate-900 text-white text-sm font-medium px-5 py-2.5 rounded-xl hover:bg-slate-800 cursor-pointer transition-colors"
                 >
-                  Show All Opportunities
+                  Show all opportunities
                 </button>
               </div>
             ) : (
               /* Opportunity Cards Grid */
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
                 {opportunities.map((opp) => (
                   <OpportunityCard
                     key={opp.id}
@@ -215,7 +220,7 @@ export default function App() {
 
       {/* UPLOAD MY CV TAB VIEW */}
       {activeTab === 'cv' && (
-        <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10 w-full">
           <CvUploadManager
             currentProfile={candidateProfile}
             onProfileSaved={(prof) => setCandidateProfile(prof)}
@@ -276,18 +281,18 @@ export default function App() {
       )}
 
       {/* Footer */}
-      <footer className="bg-slate-900 text-slate-400 border-t border-slate-800 py-8 px-4 text-xs mt-auto">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+      <footer className="mt-auto border-t border-slate-200 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
           <div>
-            <p className="font-extrabold text-white text-sm">JobL — South Africa</p>
-            <p className="text-slate-400 mt-0.5">Empowering employment discovery & application readiness.</p>
+            <p className="text-sm font-semibold text-slate-900">JobL</p>
+            <p className="text-xs text-slate-500 mt-0.5">Employment access & application readiness for South Africa</p>
           </div>
-          <div className="flex items-center space-x-4 text-slate-300">
-            <span>POPIA Compliant</span>
-            <span>•</span>
-            <span>Verified Sources</span>
-            <span>•</span>
-            <span>R5 Service Readiness</span>
+          <div className="flex items-center gap-3 text-xs text-slate-400">
+            <span>POPIA compliant</span>
+            <span className="text-slate-300">·</span>
+            <span>Verified sources</span>
+            <span className="text-slate-300">·</span>
+            <span>R5 readiness</span>
           </div>
         </div>
       </footer>
