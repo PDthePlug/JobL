@@ -68,7 +68,7 @@ export const LandingSearch: React.FC<LandingSearchProps> = ({
       {/* ═══════════════════════════════════════════════
           1. HERO — full-viewport scroll stopper
       ═══════════════════════════════════════════════ */}
-      <section className="relative min-h-[92vh] flex items-center overflow-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-white">
+      <section className="relative min-h-[85vh] sm:min-h-[92vh] flex items-center overflow-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-white">
         <div
           className="absolute inset-0 opacity-[0.07]"
           style={{

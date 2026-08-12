@@ -1,12 +1,40 @@
 import React, { useState, useRef } from 'react';
-import { CandidateCVProfile, ExtractedCVData, EmploymentItem, EducationItem } from '../types';
-import { Upload, FileText, CheckCircle2, AlertCircle, RefreshCw, User, Mail, Phone, MapPin, Briefcase, GraduationCap, Award, Globe, Plus, Trash2, Edit3, Save, ShieldCheck } from 'lucide-react';
+import {
+  CandidateCVProfile,
+  ExtractedCVData,
+  EmploymentItem,
+  EducationItem,
+} from '../types';
+import {
+  Upload,
+  FileText,
+  CheckCircle2,
+  AlertCircle,
+  RefreshCw,
+  User,
+  Mail,
+  Phone,
+  MapPin,
+  Briefcase,
+  GraduationCap,
+  Award,
+  Globe,
+  Plus,
+  Trash2,
+  Save,
+  ShieldCheck,
+} from 'lucide-react';
 
 interface CvUploadManagerProps {
   currentProfile: CandidateCVProfile | null;
   onProfileSaved: (profile: CandidateCVProfile) => void;
   onClose?: () => void;
 }
+
+const inputClass =
+  'w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300 transition-shadow';
+const labelClass = 'block text-xs font-medium text-slate-500 mb-1.5';
+const sectionClass = 'rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 space-y-4';
 
 export const CvUploadManager: React.FC<CvUploadManagerProps> = ({
   currentProfile,
@@ -15,22 +43,18 @@ export const CvUploadManager: React.FC<CvUploadManagerProps> = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Upload State
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatusText, setUploadStatusText] = useState('');
   const [uploadError, setUploadError] = useState('');
 
-  // Profile Form State (Editable extracted data)
   const [profile, setProfile] = useState<CandidateCVProfile | null>(currentProfile);
   const [extractedData, setExtractedData] = useState<ExtractedCVData | null>(
     currentProfile ? currentProfile.extractedData : null
   );
 
-  // Success message after saving
   const [saveSuccessMessage, setSaveSuccessMessage] = useState('');
 
-  // Handle File Upload from Mobile or Desktop
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -39,12 +63,11 @@ export const CvUploadManager: React.FC<CvUploadManagerProps> = ({
     setSaveSuccessMessage('');
     setIsUploading(true);
     setUploadProgress(20);
-    setUploadStatusText(`Reading ${file.name}...`);
+    setUploadStatusText(`Reading ${file.name}…`);
 
-    // File validation
     const allowedExtensions = ['.pdf', '.doc', '.docx', '.txt', '.rtf'];
     const lowerName = file.name.toLowerCase();
-    const isValidType = allowedExtensions.some(ext => lowerName.endsWith(ext));
+    const isValidType = allowedExtensions.some((ext) => lowerName.endsWith(ext));
 
     if (!isValidType) {
       setIsUploading(false);
@@ -59,7 +82,6 @@ export const CvUploadManager: React.FC<CvUploadManagerProps> = ({
     }
 
     try {
-      // Read file to Base64
       const reader = new FileReader();
       reader.onload = async () => {
         try {
@@ -67,7 +89,7 @@ export const CvUploadManager: React.FC<CvUploadManagerProps> = ({
           const base64Data = resultStr.split(',')[1] || resultStr;
 
           setUploadProgress(50);
-          setUploadStatusText('Server receiving document & extracting details...');
+          setUploadStatusText('Extracting your details…');
 
           const res = await fetch('/api/cv/upload-and-extract', {
             method: 'POST',
@@ -85,11 +107,11 @@ export const CvUploadManager: React.FC<CvUploadManagerProps> = ({
           }
 
           setUploadProgress(100);
-          
+
           if (data.extractionStatus === 'NEEDS_REVIEW') {
-            setUploadStatusText('We read most of your CV, but some information may need checking.');
+            setUploadStatusText('We read most of your CV — please check the details below.');
           } else {
-            setUploadStatusText('We\'ve read your CV. Please check the information below.');
+            setUploadStatusText('We’ve read your CV. Please review the information below.');
           }
 
           const newExtractedData: ExtractedCVData = data.extractedData;
@@ -124,16 +146,11 @@ export const CvUploadManager: React.FC<CvUploadManagerProps> = ({
     }
   };
 
-  // Field change handlers
   const handleFieldChange = (field: keyof ExtractedCVData, value: any) => {
     if (!extractedData) return;
-    setExtractedData({
-      ...extractedData,
-      [field]: value,
-    });
+    setExtractedData({ ...extractedData, [field]: value });
   };
 
-  // Employment item change handler
   const handleEmploymentChange = (index: number, key: keyof EmploymentItem, value: any) => {
     if (!extractedData) return;
     const updated = [...extractedData.employmentHistory];
@@ -154,11 +171,12 @@ export const CvUploadManager: React.FC<CvUploadManagerProps> = ({
 
   const removeEmploymentItem = (index: number) => {
     if (!extractedData) return;
-    const updated = extractedData.employmentHistory.filter((_, i) => i !== index);
-    setExtractedData({ ...extractedData, employmentHistory: updated });
+    setExtractedData({
+      ...extractedData,
+      employmentHistory: extractedData.employmentHistory.filter((_, i) => i !== index),
+    });
   };
 
-  // Education item change handler
   const handleEducationChange = (index: number, key: keyof EducationItem, value: any) => {
     if (!extractedData) return;
     const updated = [...extractedData.education];
@@ -176,11 +194,12 @@ export const CvUploadManager: React.FC<CvUploadManagerProps> = ({
 
   const removeEducationItem = (index: number) => {
     if (!extractedData) return;
-    const updated = extractedData.education.filter((_, i) => i !== index);
-    setExtractedData({ ...extractedData, education: updated });
+    setExtractedData({
+      ...extractedData,
+      education: extractedData.education.filter((_, i) => i !== index),
+    });
   };
 
-  // Save profile handler
   const handleSaveProfile = () => {
     if (!extractedData) return;
 
@@ -201,389 +220,373 @@ export const CvUploadManager: React.FC<CvUploadManagerProps> = ({
     }
 
     onProfileSaved(savedProf);
-    setSaveSuccessMessage('Your Candidate Profile & CV details have been saved successfully!');
+    setSaveSuccessMessage('Your profile has been saved.');
     setTimeout(() => setSaveSuccessMessage(''), 4000);
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden max-w-4xl mx-auto my-4 text-slate-800">
-      {/* Banner Header */}
-      <div className="bg-blue-600 text-white p-5 sm:p-6 border-b border-blue-700 flex items-center justify-between">
+    <div className="max-w-3xl mx-auto">
+      {/* Page header */}
+      <div className="mb-8 flex items-start justify-between gap-4">
         <div>
-          <div className="flex items-center space-x-2 text-xs font-semibold text-blue-100">
-            <FileText className="w-4 h-4 text-white" />
-            <span>JobL Candidate CV Profile</span>
-          </div>
-          <h2 className="text-xl font-bold text-white mt-1">CV Upload & Profile Review</h2>
-          <p className="text-xs text-blue-100 mt-0.5">
-            Upload your CV from your phone or device to automatically extract your structured information.
+          <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
+            My CV
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Upload once. We extract your details so applications take minutes, not hours.
           </p>
         </div>
-
         {onClose && (
           <button
+            type="button"
             onClick={onClose}
-            className="text-blue-100 hover:text-white bg-blue-700 hover:bg-blue-800 p-2 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+            className="text-sm font-medium text-slate-500 hover:text-slate-800 cursor-pointer"
           >
             Close
           </button>
         )}
       </div>
 
-      <div className="p-5 sm:p-6 space-y-6">
-        {/* Hidden Mobile File Input */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf,.doc,.docx,.txt,.rtf,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
-          onChange={handleFileSelect}
-          className="hidden"
-          id="jobl-mobile-cv-input"
-        />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.doc,.docx,.txt,.rtf,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+        onChange={handleFileSelect}
+        className="hidden"
+        id="jobl-mobile-cv-input"
+      />
 
-        {/* UPLOAD ACTION SECTION */}
-        {!extractedData && !isUploading && (
-          <div className="border-2 border-dashed border-blue-300 bg-blue-50/50 rounded-2xl p-8 sm:p-12 text-center space-y-4 hover:border-blue-500 transition-colors">
-            <div className="w-16 h-16 bg-blue-600 text-white rounded-full flex items-center justify-center mx-auto shadow-md">
-              <Upload className="w-8 h-8" />
+      {/* Empty — upload zone */}
+      {!extractedData && !isUploading && (
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 sm:p-14 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center mx-auto mb-5">
+            <Upload className="w-6 h-6" />
+          </div>
+          <h2 className="text-lg font-semibold text-slate-900">Upload your CV</h2>
+          <p className="text-sm text-slate-500 mt-2 max-w-sm mx-auto leading-relaxed">
+            PDF, DOC, DOCX or TXT · Max 10MB. We’ll extract your details for review.
+          </p>
+
+          {uploadError && (
+            <div className="mt-5 mx-auto max-w-md flex items-start gap-2 rounded-xl bg-red-50 border border-red-100 text-red-800 text-sm p-3.5 text-left">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{uploadError}</span>
             </div>
+          )}
 
-            <div>
-              <h3 className="text-lg font-extrabold text-slate-900">Upload Your Existing CV</h3>
-              <p className="text-xs text-slate-600 max-w-md mx-auto mt-1 leading-relaxed">
-                Select your CV document (PDF, DOC, DOCX, or TXT) from your phone or computer. JobL will parse and extract your details into a structured profile.
-              </p>
-            </div>
+          <label
+            htmlFor="jobl-mobile-cv-input"
+            className="mt-6 inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-medium text-sm px-6 py-3 rounded-xl cursor-pointer transition-colors"
+          >
+            <Upload className="w-4 h-4" />
+            Choose file
+          </label>
+        </div>
+      )}
 
-            {uploadError && (
-              <div className="bg-red-50 border border-red-200 text-red-800 p-3.5 rounded-xl text-xs flex items-center justify-center gap-2 max-w-md mx-auto">
-                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-                <span>{uploadError}</span>
+      {/* Uploading */}
+      {isUploading && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center space-y-4">
+          <div className="w-10 h-10 border-2 border-slate-300 border-t-slate-900 rounded-full animate-spin mx-auto" />
+          <div>
+            <p className="text-sm font-medium text-slate-900">Processing your document</p>
+            <p className="text-sm text-slate-500 mt-1">{uploadStatusText}</p>
+          </div>
+          <div className="w-full max-w-xs mx-auto h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-slate-900 rounded-full transition-all duration-300"
+              style={{ width: `${uploadProgress}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Review form */}
+      {extractedData && (
+        <div className="space-y-5">
+          {/* Status bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-5 h-5" />
               </div>
-            )}
-
-            <div className="pt-2">
+              <div>
+                <p className="text-sm font-medium text-slate-900">Details extracted</p>
+                <p className="text-xs text-slate-500">Review and correct anything before saving.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
               <label
                 htmlFor="jobl-mobile-cv-input"
-                className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm px-8 py-3.5 rounded-xl shadow-lg transition-all cursor-pointer transform hover:-translate-y-0.5"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 px-3 py-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
               >
-                <Upload className="w-5 h-5" />
-                <span>UPLOAD MY CV</span>
+                <RefreshCw className="w-3.5 h-3.5" />
+                Replace file
               </label>
-              <p className="text-[11px] text-slate-400 mt-2">Supported formats: PDF, DOC, DOCX, TXT • Max size 10MB</p>
+              <button
+                type="button"
+                onClick={handleSaveProfile}
+                className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium px-4 py-2 rounded-xl cursor-pointer transition-colors"
+              >
+                <Save className="w-3.5 h-3.5" />
+                Save
+              </button>
             </div>
           </div>
-        )}
 
-        {/* UPLOAD & EXTRACTION IN PROGRESS */}
-        {isUploading && (
-          <div className="border border-blue-200 bg-blue-50 rounded-2xl p-8 text-center space-y-4">
-            <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-            <div>
-              <h3 className="text-base font-bold text-slate-900">Processing Your Document</h3>
-              <p className="text-xs text-blue-700 mt-1">{uploadStatusText}</p>
+          {saveSuccessMessage && (
+            <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm px-4 py-3">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              {saveSuccessMessage}
             </div>
+          )}
 
-            <div className="w-full bg-slate-200 rounded-full h-2.5 max-w-md mx-auto overflow-hidden">
-              <div
-                className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
-                style={{ width: `${uploadProgress}%` }}
-              ></div>
-            </div>
-            <p className="text-[11px] text-slate-500 font-mono">{uploadProgress}%</p>
-          </div>
-        )}
-
-        {/* CANDIDATE REVIEW & EDITING SECTION */}
-        {extractedData && (
-          <div className="space-y-6">
-            {/* Header Banner: THIS IS WHAT WE FOUND IN YOUR CV */}
-            <div className="bg-slate-900 text-white p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-md">
-              <div>
-                <div className="flex items-center space-x-2">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                  <span className="text-xs font-bold uppercase tracking-wider text-amber-400">Extraction Complete</span>
-                </div>
-                <h3 className="text-lg font-black text-white mt-0.5">THIS IS WHAT WE FOUND IN YOUR CV</h3>
-                <p className="text-xs text-slate-300 mt-0.5">
-                  Review the extracted fields below and correct any details before saving.
-                </p>
-              </div>
-
-              <div className="flex items-center space-x-2 w-full sm:w-auto">
-                <label
-                  htmlFor="jobl-mobile-cv-input"
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold px-3.5 py-2 rounded-xl transition-colors cursor-pointer flex items-center space-x-1.5"
-                >
-                  <RefreshCw className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Upload Different CV</span>
-                </label>
-
-                <button
-                  onClick={handleSaveProfile}
-                  className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-extrabold px-4 py-2 rounded-xl shadow transition-colors flex items-center space-x-1.5 cursor-pointer"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>Save Profile</span>
-                </button>
-              </div>
-            </div>
-
-            {saveSuccessMessage && (
-              <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 p-3.5 rounded-xl text-xs flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span className="font-bold">{saveSuccessMessage}</span>
-              </div>
-            )}
-
-            {uploadError && (
-              <div className="bg-red-50 border border-red-200 text-red-800 p-3.5 rounded-xl text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-                <span>{uploadError}</span>
-              </div>
-            )}
-
-            {/* SECTION 1: PERSONAL & CONTACT INFORMATION */}
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
-              <h4 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2 border-b border-slate-200 pb-2">
-                <User className="w-4 h-4 text-blue-600" />
-                Personal & Contact Details
-              </h4>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">First Name</label>
-                  <input
-                    type="text"
-                    value={extractedData.firstName || ''}
-                    onChange={(e) => handleFieldChange('firstName', e.target.value || null)}
-                    placeholder="e.g. Thabo"
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Surname</label>
-                  <input
-                    type="text"
-                    value={extractedData.surname || ''}
-                    onChange={(e) => handleFieldChange('surname', e.target.value || null)}
-                    placeholder="e.g. Mokoena"
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Phone Number</label>
-                  <input
-                    type="tel"
-                    value={extractedData.phone || ''}
-                    onChange={(e) => handleFieldChange('phone', e.target.value || null)}
-                    placeholder="e.g. 082 123 4567"
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
-                  <input
-                    type="email"
-                    value={extractedData.email || ''}
-                    onChange={(e) => handleFieldChange('email', e.target.value || null)}
-                    placeholder="e.g. thabo@example.co.za"
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Location / City</label>
-                  <input
-                    type="text"
-                    value={extractedData.location || ''}
-                    onChange={(e) => handleFieldChange('location', e.target.value || null)}
-                    placeholder="e.g. Soweto, Johannesburg"
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* SECTION 2: PROFESSIONAL PROFILE STATEMENT */}
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3">
-              <h4 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2 border-b border-slate-200 pb-2">
-                <FileText className="w-4 h-4 text-blue-600" />
-                Professional Profile / Objective
-              </h4>
-              <textarea
-                rows={3}
-                value={extractedData.professionalProfile || ''}
-                onChange={(e) => handleFieldChange('professionalProfile', e.target.value || null)}
-                placeholder="Professional profile or summary extracted from document..."
-                className="w-full bg-white border border-slate-300 rounded-xl p-3 text-xs leading-relaxed text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              />
-            </div>
-
-            {/* SECTION 3: EMPLOYMENT HISTORY */}
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                <h4 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                  <Briefcase className="w-4 h-4 text-blue-600" />
-                  Employment History
-                </h4>
-                <button
-                  type="button"
-                  onClick={addEmploymentItem}
-                  className="text-xs font-bold text-blue-700 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Experience</span>
-                </button>
-              </div>
-
-              {extractedData.employmentHistory.length === 0 ? (
-                <p className="text-xs text-slate-500 italic">No employment history detected in CV.</p>
-              ) : (
-                <div className="space-y-4">
-                  {extractedData.employmentHistory.map((item, idx) => (
-                    <div key={idx} className="bg-white border border-slate-200 rounded-xl p-4 space-y-3 shadow-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-800">Employer #{idx + 1}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeEmploymentItem(idx)}
-                          className="text-red-600 hover:text-red-700 text-xs font-bold flex items-center gap-1 cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Remove</span>
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-[11px] font-bold text-slate-700 mb-1">Employer Name</label>
-                          <input
-                            type="text"
-                            value={item.employer || ''}
-                            onChange={(e) => handleEmploymentChange(idx, 'employer', e.target.value || null)}
-                            placeholder="e.g. Shoprite Group"
-                            className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[11px] font-bold text-slate-700 mb-1">Job Title</label>
-                          <input
-                            type="text"
-                            value={item.jobTitle || ''}
-                            onChange={(e) => handleEmploymentChange(idx, 'jobTitle', e.target.value || null)}
-                            placeholder="e.g. Till Packer"
-                            className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[11px] font-bold text-slate-700 mb-1">Dates</label>
-                          <input
-                            type="text"
-                            value={item.employmentDates || ''}
-                            onChange={(e) => handleEmploymentChange(idx, 'employmentDates', e.target.value || null)}
-                            placeholder="e.g. Jan 2023 - Dec 2024"
-                            className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* SECTION 4: EDUCATION & QUALIFICATIONS */}
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                <h4 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                  <GraduationCap className="w-4 h-4 text-blue-600" />
-                  Education & Qualifications
-                </h4>
-                <button
-                  type="button"
-                  onClick={addEducationItem}
-                  className="text-xs font-bold text-blue-700 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Education</span>
-                </button>
-              </div>
-
-              {extractedData.education.length === 0 ? (
-                <p className="text-xs text-slate-500 italic">No education or qualification details detected in CV.</p>
-              ) : (
-                <div className="space-y-4">
-                  {extractedData.education.map((item, idx) => (
-                    <div key={idx} className="bg-white border border-slate-200 rounded-xl p-4 space-y-3 shadow-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-800">Qualification #{idx + 1}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeEducationItem(idx)}
-                          className="text-red-600 hover:text-red-700 text-xs font-bold flex items-center gap-1 cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Remove</span>
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-[11px] font-bold text-slate-700 mb-1">Qualification Name</label>
-                          <input
-                            type="text"
-                            value={item.qualification || ''}
-                            onChange={(e) => handleEducationChange(idx, 'qualification', e.target.value || null)}
-                            placeholder="e.g. Grade 12 / Matric Certificate"
-                            className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[11px] font-bold text-slate-700 mb-1">Institution</label>
-                          <input
-                            type="text"
-                            value={item.institution || ''}
-                            onChange={(e) => handleEducationChange(idx, 'institution', e.target.value || null)}
-                            placeholder="e.g. Orlando High School"
-                            className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[11px] font-bold text-slate-700 mb-1">Year Passed</label>
-                          <input
-                            type="text"
-                            value={item.year || ''}
-                            onChange={(e) => handleEducationChange(idx, 'year', e.target.value || null)}
-                            placeholder="e.g. 2024"
-                            className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* SECTION 5: SKILLS, LANGUAGES, LICENCES */}
+          {/* Personal */}
+          <section className={sectionClass}>
+            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <User className="w-4 h-4 text-slate-400" />
+              Personal details
+            </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Skills */}
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
-                <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <Award className="w-4 h-4 text-blue-600" />
-                  Skills (Comma Separated)
-                </h4>
-                <textarea
-                  rows={2}
-                  value={extractedData.skills.join(', ')}
+              <div>
+                <label className={labelClass}>First name</label>
+                <input
+                  type="text"
+                  value={extractedData.firstName || ''}
+                  onChange={(e) => handleFieldChange('firstName', e.target.value || null)}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Surname</label>
+                <input
+                  type="text"
+                  value={extractedData.surname || ''}
+                  onChange={(e) => handleFieldChange('surname', e.target.value || null)}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>
+                  <span className="inline-flex items-center gap-1">
+                    <Mail className="w-3 h-3" /> Email
+                  </span>
+                </label>
+                <input
+                  type="email"
+                  value={extractedData.email || ''}
+                  onChange={(e) => handleFieldChange('email', e.target.value || null)}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>
+                  <span className="inline-flex items-center gap-1">
+                    <Phone className="w-3 h-3" /> Phone
+                  </span>
+                </label>
+                <input
+                  type="tel"
+                  value={extractedData.phone || ''}
+                  onChange={(e) => handleFieldChange('phone', e.target.value || null)}
+                  className={inputClass}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className={labelClass}>
+                  <span className="inline-flex items-center gap-1">
+                    <MapPin className="w-3 h-3" /> Location
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  value={extractedData.location || ''}
+                  onChange={(e) => handleFieldChange('location', e.target.value || null)}
+                  placeholder="City or area"
+                  className={inputClass}
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Profile statement */}
+          <section className={sectionClass}>
+            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <FileText className="w-4 h-4 text-slate-400" />
+              Professional profile
+            </h3>
+            <textarea
+              rows={3}
+              value={extractedData.professionalProfile || ''}
+              onChange={(e) => handleFieldChange('professionalProfile', e.target.value || null)}
+              placeholder="Short summary from your CV"
+              className={inputClass + ' resize-y'}
+            />
+          </section>
+
+          {/* Employment */}
+          <section className={sectionClass}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                <Briefcase className="w-4 h-4 text-slate-400" />
+                Work experience
+              </h3>
+              <button
+                type="button"
+                onClick={addEmploymentItem}
+                className="inline-flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add
+              </button>
+            </div>
+
+            {extractedData.employmentHistory.length === 0 ? (
+              <p className="text-sm text-slate-400">No experience extracted.</p>
+            ) : (
+              <div className="space-y-4">
+                {extractedData.employmentHistory.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="rounded-xl border border-slate-100 bg-slate-50/80 p-4 space-y-3"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-slate-500">Role {idx + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeEmploymentItem(idx)}
+                        className="text-slate-400 hover:text-red-600 cursor-pointer"
+                        aria-label="Remove"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className={labelClass}>Employer</label>
+                        <input
+                          type="text"
+                          value={item.employer || ''}
+                          onChange={(e) => handleEmploymentChange(idx, 'employer', e.target.value || null)}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Job title</label>
+                        <input
+                          type="text"
+                          value={item.jobTitle || ''}
+                          onChange={(e) => handleEmploymentChange(idx, 'jobTitle', e.target.value || null)}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Dates</label>
+                        <input
+                          type="text"
+                          value={item.employmentDates || ''}
+                          onChange={(e) =>
+                            handleEmploymentChange(idx, 'employmentDates', e.target.value || null)
+                          }
+                          placeholder="e.g. 2022 – 2024"
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Education */}
+          <section className={sectionClass}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                <GraduationCap className="w-4 h-4 text-slate-400" />
+                Education
+              </h3>
+              <button
+                type="button"
+                onClick={addEducationItem}
+                className="inline-flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add
+              </button>
+            </div>
+
+            {extractedData.education.length === 0 ? (
+              <p className="text-sm text-slate-400">No education extracted.</p>
+            ) : (
+              <div className="space-y-4">
+                {extractedData.education.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="rounded-xl border border-slate-100 bg-slate-50/80 p-4 space-y-3"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-slate-500">Entry {idx + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeEducationItem(idx)}
+                        className="text-slate-400 hover:text-red-600 cursor-pointer"
+                        aria-label="Remove"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className={labelClass}>Qualification</label>
+                        <input
+                          type="text"
+                          value={item.qualification || ''}
+                          onChange={(e) =>
+                            handleEducationChange(idx, 'qualification', e.target.value || null)
+                          }
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Institution</label>
+                        <input
+                          type="text"
+                          value={item.institution || ''}
+                          onChange={(e) =>
+                            handleEducationChange(idx, 'institution', e.target.value || null)
+                          }
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Year</label>
+                        <input
+                          type="text"
+                          value={item.year || ''}
+                          onChange={(e) => handleEducationChange(idx, 'year', e.target.value || null)}
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Skills / languages / licences */}
+          <section className={sectionClass}>
+            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <Award className="w-4 h-4 text-slate-400" />
+              Skills & more
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <label className={labelClass}>Skills (comma separated)</label>
+                <input
+                  type="text"
+                  value={(extractedData.skills || []).join(', ')}
                   onChange={(e) =>
                     handleFieldChange(
                       'skills',
@@ -593,20 +596,18 @@ export const CvUploadManager: React.FC<CvUploadManagerProps> = ({
                         .filter(Boolean)
                     )
                   }
-                  placeholder="e.g. Customer Service, Cash Handling, Stock Control, Punctuality"
-                  className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none"
+                  className={inputClass}
                 />
               </div>
-
-              {/* Languages */}
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
-                <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <Globe className="w-4 h-4 text-blue-600" />
-                  Languages Spoken
-                </h4>
-                <textarea
-                  rows={2}
-                  value={extractedData.languages.join(', ')}
+              <div>
+                <label className={labelClass}>
+                  <span className="inline-flex items-center gap-1">
+                    <Globe className="w-3 h-3" /> Languages
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  value={(extractedData.languages || []).join(', ')}
                   onChange={(e) =>
                     handleFieldChange(
                       'languages',
@@ -616,20 +617,18 @@ export const CvUploadManager: React.FC<CvUploadManagerProps> = ({
                         .filter(Boolean)
                     )
                   }
-                  placeholder="e.g. English, isiZulu, Sesotho"
-                  className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none"
+                  className={inputClass}
                 />
               </div>
-
-              {/* Licences & Certifications */}
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2 sm:col-span-2">
-                <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-blue-600" />
-                  Licences & Certifications
-                </h4>
+              <div>
+                <label className={labelClass}>
+                  <span className="inline-flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3" /> Licences & certifications
+                  </span>
+                </label>
                 <input
                   type="text"
-                  value={extractedData.licences.join(', ')}
+                  value={(extractedData.licences || []).join(', ')}
                   onChange={(e) =>
                     handleFieldChange(
                       'licences',
@@ -639,30 +638,26 @@ export const CvUploadManager: React.FC<CvUploadManagerProps> = ({
                         .filter(Boolean)
                     )
                   }
-                  placeholder="e.g. Code 08 Driver's License, First Aid Certificate"
-                  className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none"
+                  className={inputClass}
                 />
               </div>
             </div>
+          </section>
 
-            {/* SAVE ACTION BOTTOM BAR */}
-            <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <p className="text-xs text-slate-500">
-                Extracted data is stored securely in local browser memory.
-              </p>
-
-              <button
-                type="button"
-                onClick={handleSaveProfile}
-                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm px-8 py-3 rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2 cursor-pointer"
-              >
-                <Save className="w-4 h-4" />
-                <span>Save Corrected Information</span>
-              </button>
-            </div>
+          {/* Bottom save */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 pb-6">
+            <p className="text-xs text-slate-400">Stored locally in your browser.</p>
+            <button
+              type="button"
+              onClick={handleSaveProfile}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-medium text-sm px-6 py-3 rounded-xl cursor-pointer transition-colors"
+            >
+              <Save className="w-4 h-4" />
+              Save profile
+            </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -301,46 +301,71 @@ export const ApplicationReadinessFlow: React.FC<ApplicationReadinessFlowProps> =
     window.open(opportunity.sourceProvenance.applicationDestination, '_blank', 'noopener,noreferrer');
   };
 
+  const steps = [
+    { n: 1, label: 'Details' },
+    { n: 2, label: 'Payment' },
+    { n: 3, label: 'CV' },
+    { n: 4, label: 'Package' },
+  ];
+  const activeStepIndex = step === 5 ? 3 : step - 1;
+
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-6 flex flex-col max-h-[92vh]">
-        {/* Step Progress Bar Header */}
-        <div className="bg-blue-600 text-white p-4 sm:p-5 flex items-center justify-between border-b border-blue-700">
-          <div>
-            <div className="flex items-center space-x-2 text-xs font-semibold text-blue-100">
-              <Sparkles className="w-4 h-4 text-white" />
-              <span>JobL Application Readiness Service</span>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} aria-hidden />
+      <div className="relative bg-white w-full sm:max-w-xl sm:rounded-2xl shadow-2xl border border-slate-200/80 overflow-hidden my-0 sm:my-6 flex flex-col max-h-[94vh] sm:max-h-[90vh] rounded-t-2xl sm:rounded-2xl">
+        {/* Header */}
+        <div className="shrink-0 px-5 sm:px-6 pt-5 pb-4 border-b border-slate-100">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-slate-500 mb-1">Application readiness</p>
+              <h2 className="text-base sm:text-lg font-semibold text-slate-900 tracking-tight leading-snug truncate">
+                {opportunity.title}
+              </h2>
+              <p className="text-sm text-slate-500 mt-0.5 truncate">{opportunity.employer}</p>
             </div>
-            <h2 className="text-base sm:text-lg font-bold text-white mt-0.5">
-              Preparing for: <span className="text-blue-100">{opportunity.title}</span> ({opportunity.employer})
-            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className="shrink-0 p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
-          <button
-            onClick={onClose}
-            className="text-blue-100 hover:text-white p-2 rounded-lg bg-blue-700 hover:bg-blue-800 transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Indicator Stepper */}
-        <div className="bg-slate-900 text-slate-300 px-4 py-2.5 border-b border-slate-800 text-[11px] font-semibold flex items-center justify-between">
-          <span className={step === 1 ? 'text-blue-400 font-extrabold' : 'text-slate-400'}>1. Lead Info</span>
-          <span className="text-slate-600">&rarr;</span>
-          <span className={step === 2 ? 'text-blue-400 font-extrabold' : 'text-slate-400'}>2. R5 Payment</span>
-          <span className="text-slate-600">&rarr;</span>
-          <span className={step === 3 ? 'text-blue-400 font-extrabold' : 'text-slate-400'}>3. CV / Profile</span>
-          <span className="text-slate-600">&rarr;</span>
-          <span className={step === 4 || step === 5 ? 'text-blue-400 font-extrabold' : 'text-slate-400'}>4. Application Package</span>
+          {/* Stepper */}
+          <div className="mt-5 flex items-center gap-2">
+            {steps.map((s, i) => {
+              const done = i < activeStepIndex;
+              const current = i === activeStepIndex;
+              return (
+                <div key={s.n} className="flex items-center gap-2 flex-1 min-w-0">
+                  <div
+                    className={`
+                      w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0
+                      ${current ? 'bg-slate-900 text-white' : done ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}
+                    `}
+                  >
+                    {done ? '✓' : s.n}
+                  </div>
+                  <span className={`text-xs font-medium truncate hidden sm:inline ${current ? 'text-slate-900' : 'text-slate-400'}`}>
+                    {s.label}
+                  </span>
+                  {i < steps.length - 1 && (
+                    <div className={`flex-1 h-px ${done ? 'bg-emerald-300' : 'bg-slate-200'}`} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* STEP 1: CANDIDATE LEAD CAPTURE */}
         {step === 1 && (
-          <form onSubmit={handleLeadSubmit} className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1 text-slate-800">
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3.5 text-xs text-blue-950">
-              <p className="font-bold flex items-center gap-1.5 text-blue-900">
-                <ShieldCheck className="w-4 h-4 text-blue-600" />
+          <form onSubmit={handleLeadSubmit} className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1 text-slate-800">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-700">
+              <p className="font-medium flex items-center gap-1.5 text-slate-900">
+                <ShieldCheck className="w-4 h-4 text-slate-500" />
                 Candidate Contact Details
               </p>
               <p className="mt-1 text-blue-800">
@@ -357,62 +382,62 @@ export const ApplicationReadinessFlow: React.FC<ApplicationReadinessFlowProps> =
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">First Name *</label>
+                <label className="block text-xs font-medium text-slate-500 mb-1.5">First Name *</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Thabo"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Surname *</label>
+                <label className="block text-xs font-medium text-slate-500 mb-1.5">Surname *</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Mokoena"
                   value={surname}
                   onChange={(e) => setSurname(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Mobile Phone (SA) *</label>
+                <label className="block text-xs font-medium text-slate-500 mb-1.5">Mobile Phone (SA) *</label>
                 <input
                   type="tel"
                   required
                   placeholder="e.g. 082 123 4567"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Email Address *</label>
+                <label className="block text-xs font-medium text-slate-500 mb-1.5">Email Address *</label>
                 <input
                   type="email"
                   required
                   placeholder="e.g. thabo@example.co.za"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Your Current Location</label>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">Your Current Location</label>
               <input
                 type="text"
                 value={locationCity}
                 onChange={(e) => setLocationCity(e.target.value)}
                 placeholder="e.g. Soweto, Johannesburg"
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300"
               />
             </div>
 
@@ -434,7 +459,7 @@ export const ApplicationReadinessFlow: React.FC<ApplicationReadinessFlowProps> =
             <div className="pt-2">
               <button
                 type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl text-sm transition-all shadow-md flex items-center justify-center space-x-2 cursor-pointer"
+                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-3.5 rounded-xl text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
               >
                 <span>Proceed to R5 Payment Gate</span>
                 <ArrowRight className="w-4 h-4" />
@@ -445,15 +470,15 @@ export const ApplicationReadinessFlow: React.FC<ApplicationReadinessFlowProps> =
 
         {/* STEP 2: R5 PAYMENT GATEWAY */}
         {step === 2 && (
-          <form onSubmit={handlePaymentSubmit} className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1 text-slate-800">
-            <div className="bg-slate-900 text-white rounded-xl p-4 flex items-center justify-between">
+          <form onSubmit={handlePaymentSubmit} className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1 text-slate-800">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between">
               <div>
-                <p className="text-xs text-amber-400 font-semibold uppercase tracking-wider">JobL Application Readiness Fee</p>
-                <p className="text-2xl font-black text-white mt-0.5">R5.00 <span className="text-xs font-normal text-slate-300">ZAR</span></p>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Readiness fee</p>
+                <p className="text-2xl font-semibold text-slate-900 mt-0.5">R5 <span className="text-sm font-normal text-slate-400">ZAR</span></p>
               </div>
-              <div className="bg-amber-500/20 text-amber-300 text-xs px-2.5 py-1 rounded-lg border border-amber-500/30">
-                Single Vacancy Package
-              </div>
+              <span className="text-xs font-medium text-slate-600 bg-white border border-slate-200 px-2.5 py-1 rounded-lg">
+                Per vacancy
+              </span>
             </div>
 
             {paymentError && (
@@ -464,7 +489,7 @@ export const ApplicationReadinessFlow: React.FC<ApplicationReadinessFlowProps> =
             )}
 
             <div className="space-y-3">
-              <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">Select Payment Rail</label>
+              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">Select Payment Rail</label>
 
               {/* Voucher Redemption Option */}
               <label className={`block border p-3.5 rounded-xl cursor-pointer transition-all ${
@@ -555,7 +580,7 @@ export const ApplicationReadinessFlow: React.FC<ApplicationReadinessFlowProps> =
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-semibold cursor-pointer"
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 cursor-pointer"
               >
                 Back
               </button>
@@ -582,7 +607,7 @@ export const ApplicationReadinessFlow: React.FC<ApplicationReadinessFlowProps> =
 
         {/* STEP 3: CANDIDATE EXPERIENCE & CV BUILDER */}
         {step === 3 && (
-          <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1 text-slate-800">
+          <div className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1 text-slate-800">
             <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl p-3.5 text-xs flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -650,14 +675,14 @@ export const ApplicationReadinessFlow: React.FC<ApplicationReadinessFlowProps> =
               <button
                 type="button"
                 onClick={() => setStep(2)}
-                className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-semibold cursor-pointer"
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 cursor-pointer"
               >
                 Back
               </button>
               <button
                 type="button"
                 onClick={handleGeneratePackage}
-                className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3 rounded-xl text-sm transition-all shadow-md flex items-center justify-center space-x-2 cursor-pointer"
+                className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-semibold py-3.5 rounded-xl text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Sparkles className="w-4 h-4" />
                 <span>Build Job-Specific Application Package</span>
@@ -671,22 +696,23 @@ export const ApplicationReadinessFlow: React.FC<ApplicationReadinessFlowProps> =
           <div className="p-8 text-center space-y-4 overflow-y-auto flex-1 flex flex-col items-center justify-center">
             {isGenerating ? (
               <>
-                <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
-                <h3 className="text-lg font-bold text-slate-900">JobL Engine Analyzing Job Requirements...</h3>
-                <p className="text-xs text-slate-600 max-w-md leading-relaxed">
-                  Comparing your profile against <strong>{opportunity.title}</strong> at <strong>{opportunity.employer}</strong>. Generating tailored CV, cover letter, keyword alignment, and interview preparation.
+                <div className="w-10 h-10 border-2 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
+                <h3 className="text-base font-semibold text-slate-900">Building your package…</h3>
+                <p className="text-sm text-slate-500 max-w-sm leading-relaxed">
+                  Matching your profile to <strong className="text-slate-700">{opportunity.title}</strong> at {opportunity.employer}. Tailored CV, cover letter, and prep tips.
                 </p>
               </>
             ) : generationError ? (
               <div className="space-y-3">
-                <AlertCircle className="w-10 h-10 text-red-500 mx-auto" />
-                <h3 className="text-base font-bold text-red-800">Generation Notice</h3>
-                <p className="text-xs text-slate-600">{generationError}</p>
+                <AlertCircle className="w-8 h-8 text-red-500 mx-auto" />
+                <h3 className="text-base font-semibold text-red-800">Something went wrong</h3>
+                <p className="text-sm text-slate-600">{generationError}</p>
                 <button
+                  type="button"
                   onClick={handleGeneratePackage}
-                  className="bg-slate-900 text-white text-xs font-bold px-4 py-2 rounded-xl cursor-pointer"
+                  className="bg-slate-900 text-white text-sm font-medium px-5 py-2.5 rounded-xl cursor-pointer"
                 >
-                  Retry Generation
+                  Try again
                 </button>
               </div>
             ) : null}
@@ -697,15 +723,15 @@ export const ApplicationReadinessFlow: React.FC<ApplicationReadinessFlowProps> =
         {step === 5 && cvAnalysis && (
           <div className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1 text-slate-800">
             {/* Compatibility Summary Banner */}
-            <div className="bg-slate-900 text-white rounded-xl p-4 flex items-center justify-between">
-              <div>
-                <p className="text-xs text-amber-400 font-semibold uppercase tracking-wider">Application Package Ready</p>
-                <h3 className="text-lg font-bold text-white">{opportunity.title}</h3>
-                <p className="text-xs text-slate-300 mt-0.5">{cvAnalysis.candidateSummary}</p>
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-emerald-700 uppercase tracking-wide">Package ready</p>
+                <h3 className="text-base font-semibold text-slate-900 mt-0.5 truncate">{opportunity.title}</h3>
+                <p className="text-sm text-slate-500 mt-0.5 line-clamp-2">{cvAnalysis.candidateSummary}</p>
               </div>
-              <div className="text-center bg-slate-800 border border-slate-700 px-3 py-2 rounded-xl">
-                <span className="text-xl font-extrabold text-amber-400">{cvAnalysis.overallCompatibilityScore}%</span>
-                <span className="block text-[10px] text-slate-400">Match Quality</span>
+              <div className="text-center bg-white border border-slate-200 px-3 py-2 rounded-xl shrink-0">
+                <span className="text-xl font-semibold text-slate-900">{cvAnalysis.overallCompatibilityScore}%</span>
+                <span className="block text-[10px] text-slate-400">Match</span>
               </div>
             </div>
 
@@ -749,7 +775,7 @@ export const ApplicationReadinessFlow: React.FC<ApplicationReadinessFlowProps> =
             )}
 
             {/* Interview Prep Tips */}
-            <div className="bg-slate-900 text-white rounded-xl p-4 space-y-2">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2">
               <p className="text-xs font-bold text-amber-400 uppercase tracking-wider">Role-Specific Interview Prep</p>
               <ul className="space-y-1 text-xs text-slate-300">
                 {cvAnalysis.interviewPrepTips.map((tip, i) => (

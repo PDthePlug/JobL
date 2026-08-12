@@ -1,5 +1,5 @@
 import React from 'react';
-import { Briefcase, FileCheck, LayoutDashboard, ShieldCheck, MapPin, FileText } from 'lucide-react';
+import { Briefcase, FileText, FileCheck, LayoutDashboard } from 'lucide-react';
 
 interface HeaderProps {
   activeTab: 'search' | 'cv' | 'applications' | 'operator';
@@ -16,84 +16,115 @@ export const Header: React.FC<HeaderProps> = ({
   savedPackagesCount,
   hasSavedCvProfile,
 }) => {
+  const navItems: Array<{
+    id: 'search' | 'cv' | 'applications' | 'operator';
+    label: string;
+    shortLabel: string;
+    icon: React.ElementType;
+    badge?: number | boolean;
+    badgeTone?: 'brand' | 'success';
+  }> = [
+    {
+      id: 'search',
+      label: 'Jobs',
+      shortLabel: 'Jobs',
+      icon: Briefcase,
+      badge: opportunityCount > 0 ? opportunityCount : undefined,
+      badgeTone: 'brand',
+    },
+    {
+      id: 'cv',
+      label: 'My CV',
+      shortLabel: 'CV',
+      icon: FileText,
+      badge: hasSavedCvProfile ? true : undefined,
+      badgeTone: 'success',
+    },
+    {
+      id: 'applications',
+      label: 'Applications',
+      shortLabel: 'Apps',
+      icon: FileCheck,
+      badge: savedPackagesCount > 0 ? savedPackagesCount : undefined,
+      badgeTone: 'success',
+    },
+    {
+      id: 'operator',
+      label: 'Operator',
+      shortLabel: 'Ops',
+      icon: LayoutDashboard,
+    },
+  ];
+
   return (
-    <header className="bg-white text-slate-800 border-b border-slate-200 sticky top-0 z-40 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Brand Logo & Tagline */}
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('search')}>
-            <div className="bg-blue-600 text-white font-black text-2xl px-2.5 py-1 rounded-xl tracking-wider flex items-center gap-1">
-              JobL
+    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 safe-top">
+      <div className="max-w-6xl mx-auto px-3 sm:px-6">
+        <div className="flex items-center justify-between h-14 sm:h-16 gap-2">
+          {/* Brand */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('search')}
+            className="flex items-center gap-2 group cursor-pointer shrink-0 min-w-0"
+          >
+            <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-sm tracking-tight group-hover:bg-slate-800 transition-colors">
+              J
             </div>
-            <div className="hidden sm:block border-l border-slate-300 pl-3">
-              <p className="text-xs font-bold text-slate-800">South African Employment & Application Readiness</p>
-              <p className="text-[11px] text-slate-500">Find real jobs near you • Get application ready</p>
+            <div className="hidden xs:block sm:block text-left">
+              <p className="text-sm font-semibold text-slate-900 leading-none tracking-tight">
+                JobL
+              </p>
+              <p className="text-[11px] text-slate-500 mt-0.5 leading-none hidden sm:block">
+                South Africa
+              </p>
             </div>
-          </div>
+          </button>
 
-          {/* Navigation Tabs */}
-          <nav className="flex items-center space-x-1 sm:space-x-2">
-            <button
-              onClick={() => setActiveTab('search')}
-              className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
-                activeTab === 'search'
-                  ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              <Briefcase className="w-4 h-4 text-blue-600" />
-              <span>Find Opportunities</span>
-              {opportunityCount > 0 && (
-                <span className="bg-white text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full border border-blue-200 shadow-sm">
-                  {opportunityCount}
-                </span>
-              )}
-            </button>
+          {/* Nav — scrollable on very small screens */}
+          <nav className="flex items-center gap-0.5 overflow-x-auto no-scrollbar max-w-[70%] sm:max-w-none">
+            {navItems.map((item) => {
+              const isActive = activeTab === item.id;
+              const Icon = item.icon;
 
-            <button
-              onClick={() => setActiveTab('cv')}
-              className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
-                activeTab === 'cv'
-                  ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              <FileText className="w-4 h-4 text-blue-600" />
-              <span>UPLOAD MY CV</span>
-              {hasSavedCvProfile && (
-                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-              )}
-            </button>
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setActiveTab(item.id)}
+                  className={`
+                    relative flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer shrink-0
+                    min-h-[40px]
+                    ${
+                      isActive
+                        ? 'bg-slate-100 text-slate-900'
+                        : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                    }
+                  `}
+                >
+                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-slate-900' : 'text-slate-400'}`} />
+                  <span className="hidden sm:inline">{item.label}</span>
+                  <span className="sm:hidden text-xs">{item.shortLabel}</span>
 
-            <button
-              onClick={() => setActiveTab('applications')}
-              className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
-                activeTab === 'applications'
-                  ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              <FileCheck className="w-4 h-4 text-blue-600" />
-              <span className="hidden md:inline">My Applications</span>
-              <span className="md:hidden">Packages</span>
-              {savedPackagesCount > 0 && (
-                <span className="bg-emerald-50 text-emerald-700 text-xs font-bold px-2 py-0.5 rounded-full border border-emerald-200 shadow-sm">
-                  {savedPackagesCount}
-                </span>
-              )}
-            </button>
+                  {typeof item.badge === 'number' && item.badge > 0 && (
+                    <span
+                      className={`
+                        ml-0.5 min-w-[1.15rem] h-[1.15rem] px-1 rounded-full text-[10px] font-semibold flex items-center justify-center
+                        ${
+                          item.badgeTone === 'success'
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : 'bg-slate-200 text-slate-700'
+                        }
+                      `}
+                    >
+                      {item.badge > 99 ? '99+' : item.badge}
+                    </span>
+                  )}
 
-            <button
-              onClick={() => setActiveTab('operator')}
-              className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
-                activeTab === 'operator'
-                  ? 'bg-slate-100 text-slate-800 border border-slate-300 shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              <LayoutDashboard className="w-4 h-4 text-slate-500" />
-              <span className="hidden lg:inline">Operator View</span>
-            </button>
+                  {item.badge === true && (
+                    <span className="absolute top-1.5 right-1 w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  )}
+                </button>
+              );
+            })}
           </nav>
         </div>
       </div>
