@@ -1,7 +1,33 @@
 import React, { useState } from 'react';
-import { Opportunity, CandidateLead, PaymentTransaction, CVAnalysisResult, ApplicationPackage, ExtractedCVData, JobRequirements, JobMatchAnalysis, ApplicationReadinessAnalysis } from '../types';
-import { X, Sparkles, CheckCircle2, ShieldCheck, CreditCard, Lock, Copy, Check, ExternalLink, ArrowRight, FileText, AlertCircle, RefreshCw, Upload } from 'lucide-react';
-import { ApplicationDocuments } from './ApplicationDocuments';
+import {
+  ApplicationPackage,
+  ApplicationReadinessAnalysis,
+  CandidateCVProfile,
+  CandidateLead,
+  CVAnalysisResult,
+  ExtractedCVData,
+  GeneratedDocumentResponse,
+  JobMatchAnalysis,
+  JobRequirements,
+  Opportunity,
+  PaymentTransaction,
+} from '../types';
+import {
+  AlertCircle,
+  ArrowRight,
+  Check,
+  CheckCircle2,
+  Copy,
+  CreditCard,
+  ExternalLink,
+  FileText,
+  Lock,
+  RefreshCw,
+  ShieldCheck,
+  Upload,
+  X,
+} from 'lucide-react';
+import { ApplicationDocuments, GeneratedApplicationDocuments } from './ApplicationDocuments';
 
 interface ApplicationReadinessFlowProps {
   opportunity: Opportunity;
@@ -13,6 +39,69 @@ interface ApplicationReadinessFlowProps {
   candidateConfirmations?: Record<string, string>;
 }
 
+type FlowStage = 'cv' | 'payment' | 'ready';
+type PaymentMethod = 'PEACH_PAYMENTS' | 'OZOW_EFT' | 'JOBL_VOUCHER';
+
+type ApplicationPackageWithDocuments = ApplicationPackage & {
+  opportunitySnapshot?: Opportunity;
+  jobRequirementsSnapshot?: JobRequirements;
+  matchAnalysisSnapshot?: JobMatchAnalysis;
+  readinessAnalysisSnapshot?: ApplicationReadinessAnalysis;
+  candidateConfirmationsSnapshot?: Record<string, string>;
+  generatedDocuments?: {
+    cv?: GeneratedDocumentResponse;
+    coverLetter?: GeneratedDocumentResponse;
+  };
+};
+
+const profileToText = (profile: ExtractedCVData | null) => {
+  if (!profile) return '';
+
+  let text = `${profile.firstName || ''} ${profile.surname || ''}\n`.trim();
+  if (profile.phone) text += `\nPhone: ${profile.phone}`;
+  if (profile.email) text += `\nEmail: ${profile.email}`;
+  if (profile.location) text += `\nLocation: ${profile.location}`;
+  if (profile.professionalProfile) text += `\n\nProfile:\n${profile.professionalProfile}`;
+
+  if (profile.employmentHistory?.length) {
+    text +=
+      '\n\nWork experience:\n' +
+      profile.employmentHistory
+        .map(
+          (item) =>
+            `- ${item.jobTitle || 'Role'} at ${item.employer || 'Employer'}${
+              item.employmentDates ? ` (${item.employmentDates})` : ''
+            }`
+        )
+        .join('\n');
+  }
+
+  if (profile.education?.length) {
+    text +=
+      '\n\nEducation:\n' +
+      profile.education
+        .map(
+          (item) =>
+            `- ${item.qualification || 'Qualification'} at ${item.institution || 'Institution'}${
+              item.year ? ` (${item.year})` : ''
+            }`
+        )
+        .join('\n');
+  }
+
+  if (profile.skills?.length) text += `\n\nSkills: ${profile.skills.join(', ')}`;
+  return text.trim();
+};
+
+const loadSavedProfile = (): CandidateCVProfile | null => {
+  try {
+    const stored = localStorage.getItem('jobl_candidate_cv_profile');
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+};
+
 export const ApplicationReadinessFlow: React.FC<ApplicationReadinessFlowProps> = ({
   opportunity,
   onClose,
@@ -20,81 +109,79 @@ export const ApplicationReadinessFlow: React.FC<ApplicationReadinessFlowProps> =
   jobRequirements,
   matchAnalysis,
   readinessAnalysis,
-  candidateConfirmations,
+  candidateConfirmations = {},
 }) => {
-  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
+  const savedProfile = loadSavedProfile();
+  const initialExtracted = savedProfile?.extractedData || null;
+  const fullNameParts = (initialExtracted?.fullName || '').trim().split(/\s+/).filter(Boolean);
 
-  // Step 1: Lead Capture
-  const [firstName, setFirstName] = useState('');
-  const [surname, setSurname] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [locationCity, setLocationCity] = useState(opportunity.location.city || 'Johannesburg');
-  const [popiaAgreed, setPopiaAgreed] = useState(false);
-  const [leadError, setLeadError] = useState('');
-
-  // Step 2: Payment
-  const [paymentMethod, setPaymentMethod] = useState<'PEACH_PAYMENTS' | 'OZOW_EFT' | 'JOBL_VOUCHER'>('JOBL_VOUCHER');
-  const [voucherCode, setVoucherCode] = useState('JOBL-R5-FREE-2026');
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [paymentTransaction, setPaymentTransaction] = useState<PaymentTransaction | null>(null);
-  const [paymentError, setPaymentError] = useState('');
-
-  // Step 3: CV Text & Upload
-  const [candidateProfile, setCandidateProfile] = useState<ExtractedCVData | null>(() => {
-    try {
-      const stored = localStorage.getItem('jobl_candidate_cv_profile');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        return parsed.extractedData || null;
-      }
-    } catch {}
-    return null;
-  });
-
-  const [cvText, setCvText] = useState(() => {
-    try {
-      const stored = localStorage.getItem('jobl_candidate_cv_profile');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        const ext = parsed.extractedData;
-        if (ext) {
-          let text = `${ext.firstName || ''} ${ext.surname || ''}\n`.trim();
-          if (ext.phone) text += `Phone: ${ext.phone}\n`;
-          if (ext.email) text += `Email: ${ext.email}\n`;
-          if (ext.location) text += `Location: ${ext.location}\n`;
-          if (ext.professionalProfile) text += `\nProfile:\n${ext.professionalProfile}\n`;
-          if (ext.employmentHistory?.length) {
-            text += `\nWork Experience:\n` + ext.employmentHistory.map((h: any) => `- ${h.jobTitle} at ${h.employer} (${h.employmentDates || ''})`).join('\n') + '\n';
-          }
-          if (ext.education?.length) {
-            text += `\nEducation:\n` + ext.education.map((ed: any) => `- ${ed.qualification} at ${ed.institution} (${ed.year || ''})`).join('\n') + '\n';
-          }
-          if (ext.skills?.length) text += `\nSkills: ${ext.skills.join(', ')}`;
-          return text;
-        }
-      }
-    } catch {}
-    return '';
-  });
+  const [stage, setStage] = useState<FlowStage>('cv');
+  const [candidateProfile, setCandidateProfile] = useState<ExtractedCVData | null>(initialExtracted);
+  const [cvText, setCvText] = useState(profileToText(initialExtracted));
+  const [showExperienceFallback, setShowExperienceFallback] = useState(!initialExtracted);
   const [isExtractingCv, setIsExtractingCv] = useState(false);
-  const [step3UploadError, setStep3UploadError] = useState('');
+  const [cvError, setCvError] = useState('');
 
-  const handleStep3FileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const [firstName, setFirstName] = useState(
+    initialExtracted?.firstName || fullNameParts[0] || ''
+  );
+  const [surname, setSurname] = useState(
+    initialExtracted?.surname || (fullNameParts.length > 1 ? fullNameParts.slice(1).join(' ') : '')
+  );
+  const [phone, setPhone] = useState(initialExtracted?.phone || '');
+  const [email, setEmail] = useState(initialExtracted?.email || '');
+  const [locationCity, setLocationCity] = useState(
+    initialExtracted?.location || initialExtracted?.city || opportunity.location.city || ''
+  );
+  const [popiaAgreed, setPopiaAgreed] = useState(false);
+  const [detailsError, setDetailsError] = useState('');
+
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('PEACH_PAYMENTS');
+  const [voucherCode, setVoucherCode] = useState('');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
+  const [paymentTransaction, setPaymentTransaction] = useState<PaymentTransaction | null>(null);
+
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState('');
+  const [cvAnalysis, setCvAnalysis] = useState<CVAnalysisResult | null>(null);
+  const [createdPackage, setCreatedPackage] = useState<ApplicationPackage | null>(null);
+  const [copiedCv, setCopiedCv] = useState(false);
+  const [copiedCoverLetter, setCopiedCoverLetter] = useState(false);
+  const [handoffMessage, setHandoffMessage] = useState('');
+
+  const stages: Array<{ id: FlowStage; label: string }> = [
+    { id: 'cv', label: 'CV' },
+    { id: 'payment', label: 'R5' },
+    { id: 'ready', label: 'Ready' },
+  ];
+  const activeStageIndex = stages.findIndex((item) => item.id === stage);
+
+  const handleCvUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (!file) return;
 
-    setStep3UploadError('');
-    setIsExtractingCv(true);
+    setCvError('');
 
+    const allowedExtensions = ['.pdf', '.doc', '.docx', '.txt', '.rtf'];
+    const lowerName = file.name.toLowerCase();
+    if (!allowedExtensions.some((extension) => lowerName.endsWith(extension))) {
+      setCvError('Please choose a PDF, DOC, DOCX, TXT or RTF CV.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setCvError('That CV is larger than 10MB. Please choose a smaller file.');
+      return;
+    }
+
+    setIsExtractingCv(true);
     try {
       const reader = new FileReader();
       reader.onload = async () => {
         try {
-          const resultStr = reader.result as string;
-          const base64Data = resultStr.split(',')[1] || resultStr;
-
-          const res = await fetch('/api/cv/upload-and-extract', {
+          const resultString = reader.result as string;
+          const base64Data = resultString.split(',')[1] || resultString;
+          const response = await fetch('/api/cv/upload-and-extract', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -104,187 +191,222 @@ export const ApplicationReadinessFlow: React.FC<ApplicationReadinessFlowProps> =
             }),
           });
 
-          const data = await res.json();
-          if (!data.success) {
-            throw new Error(data.error || 'CV extraction failed');
-          }
+          const data = await response.json();
+          if (!data.success) throw new Error(data.error || 'We could not read that CV.');
 
-          const ext = data.extractedData;
-          let text = `${ext.firstName || ''} ${ext.surname || ''}\n`.trim();
-          if (ext.phone) text += `Phone: ${ext.phone}\n`;
-          if (ext.email) text += `Email: ${ext.email}\n`;
-          if (ext.location) text += `Location: ${ext.location}\n`;
-          if (ext.professionalProfile) text += `\nProfile:\n${ext.professionalProfile}\n`;
-          if (ext.employmentHistory?.length) {
-            text += `\nWork Experience:\n` + ext.employmentHistory.map((h: any) => `- ${h.jobTitle || 'Role'} at ${h.employer || 'Company'} (${h.employmentDates || ''})`).join('\n') + '\n';
-          }
-          if (ext.education?.length) {
-            text += `\nEducation:\n` + ext.education.map((ed: any) => `- ${ed.qualification || 'Qualification'} at ${ed.institution || 'Institution'} (${ed.year || ''})`).join('\n') + '\n';
-          }
-          if (ext.skills?.length) text += `\nSkills: ${ext.skills.join(', ')}`;
+          const extracted: ExtractedCVData = data.extractedData;
+          const saved: CandidateCVProfile = {
+            id: savedProfile?.id || `CV-PROF-${Date.now()}`,
+            fileName: data.fileName || file.name,
+            fileType: data.fileType || file.type || 'application/pdf',
+            uploadedAt: data.uploadedAt || new Date().toISOString(),
+            extractedData: extracted,
+            updatedAt: new Date().toISOString(),
+          };
 
-          setCvText(text);
+          setCandidateProfile(extracted);
+          setCvText(profileToText(extracted));
+          setShowExperienceFallback(false);
+          setFirstName(extracted.firstName || firstName);
+          setSurname(extracted.surname || surname);
+          setPhone(extracted.phone || phone);
+          setEmail(extracted.email || email);
+          setLocationCity(extracted.location || extracted.city || locationCity);
+          localStorage.setItem('jobl_candidate_cv_profile', JSON.stringify(saved));
           setIsExtractingCv(false);
-        } catch (err: any) {
+        } catch (error: any) {
+          setCvError(error?.message || 'We could not read that CV.');
           setIsExtractingCv(false);
-          setStep3UploadError(err.message || 'Error processing CV file.');
         }
       };
 
+      reader.onerror = () => {
+        setCvError('We could not read that file from your device.');
+        setIsExtractingCv(false);
+      };
       reader.readAsDataURL(file);
-    } catch (err: any) {
+    } catch (error: any) {
+      setCvError(error?.message || 'We could not open that CV.');
       setIsExtractingCv(false);
-      setStep3UploadError(err.message || 'Error reading file.');
     }
   };
 
-  // Step 4: AI Processing
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [cvAnalysis, setCvAnalysis] = useState<CVAnalysisResult | null>(null);
-  const [generationError, setGenerationError] = useState('');
+  const continueToPayment = () => {
+    setDetailsError('');
 
-  // Step 5: Completed Package
-  const [createdPackage, setCreatedPackage] = useState<ApplicationPackage | null>(null);
-  const [copiedCv, setCopiedCv] = useState(false);
-  const [copiedCoverLetter, setCopiedCoverLetter] = useState(false);
-
-  // Step 1 Handler: Submit Lead
-  const handleLeadSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLeadError('');
-
+    if (!cvText.trim()) {
+      setDetailsError('Add your CV or a short summary of your experience first.');
+      return;
+    }
     if (!firstName.trim() || !surname.trim()) {
-      setLeadError('Please enter your full first name and surname.');
+      setDetailsError('Please check your first name and surname.');
       return;
     }
-    if (!phone.trim() || phone.length < 10) {
-      setLeadError('Please enter a valid South African phone number (e.g. 082 123 4567).');
+    if (phone.replace(/\D/g, '').length < 10) {
+      setDetailsError('Please enter a valid South African mobile number.');
       return;
     }
-    if (!email.trim() || !email.includes('@')) {
-      setLeadError('Please enter a valid email address.');
+    if (!email.includes('@')) {
+      setDetailsError('Please enter a valid email address.');
       return;
     }
     if (!popiaAgreed) {
-      setLeadError('You must agree to the POPIA data protection terms to proceed.');
+      setDetailsError('Please agree so JobL can prepare this application for you.');
       return;
     }
 
-    setStep(2);
+    setStage('payment');
   };
 
-  // Step 2 Handler: Process R5 Payment
-  const handlePaymentSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setPaymentError('');
-    setIsProcessingPayment(true);
+  const candidateLead = (): CandidateLead => ({
+    firstName: firstName.trim(),
+    surname: surname.trim(),
+    phone: phone.trim(),
+    email: email.trim(),
+    locationCity: locationCity.trim(),
+    locationProvince: opportunity.location.province,
+    popiaConsent: {
+      agreed: true,
+      timestamp: new Date().toISOString(),
+      purpose: 'JobL Application Readiness Service & Employer Referral',
+      consentVersion: '1.0-POPIA-ZA',
+    },
+  });
 
-    try {
-      const res = await fetch('/api/payment/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          opportunityId: opportunity.id,
-          candidateEmail: email,
-          provider: paymentMethod,
-          voucherCode: paymentMethod === 'JOBL_VOUCHER' ? voucherCode : undefined,
-        }),
-      });
-
-      const data = await res.json();
-      if (!data.success) {
-        throw new Error(data.error || 'Payment transaction failed.');
-      }
-
-      setPaymentTransaction(data.transaction);
-      setIsProcessingPayment(false);
-      setStep(3);
-    } catch (err: any) {
-      setIsProcessingPayment(false);
-      setPaymentError(err.message || 'Payment failed. Please verify voucher or details.');
-    }
-  };
-
-  // Step 3 & 4 Handler: Generate Application Package
-  const handleGeneratePackage = async () => {
-    if (!paymentTransaction) return;
-
-    setStep(4);
+  const generateApplication = async (transaction: PaymentTransaction) => {
+    setStage('ready');
     setIsGenerating(true);
     setGenerationError('');
 
-    const candidateLead: CandidateLead = {
-      firstName,
-      surname,
-      phone,
-      email,
-      locationCity,
-      locationProvince: opportunity.location.province,
-      popiaConsent: {
-        agreed: true,
-        timestamp: new Date().toISOString(),
-        purpose: 'JobL Application Readiness Service & Employer Referral',
-        consentVersion: '1.0-POPIA-ZA',
-      },
-    };
-
     try {
-      const res = await fetch('/api/cv/analyze-and-prepare', {
+      const response = await fetch('/api/cv/analyze-and-prepare', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          candidate: candidateLead,
+          candidate: candidateLead(),
           cvText,
           opportunity,
-          transactionId: paymentTransaction.transactionId,
+          transactionId: transaction.transactionId,
         }),
       });
 
-      const data = await res.json();
+      const data = await response.json();
       if (!data.success) {
-        throw new Error(data.error || 'Failed to generate tailored application package.');
+        throw new Error(data.error || 'We could not prepare your application.');
       }
 
       const analysis: CVAnalysisResult = data.cvAnalysis;
-      setCvAnalysis(analysis);
-
-      const pkg: ApplicationPackage = {
+      const pkg: ApplicationPackageWithDocuments = {
         packageId: `PKG-${Date.now()}`,
         opportunityId: opportunity.id,
         opportunityTitle: opportunity.title,
         employerName: opportunity.employer,
-        candidateLead,
-        paymentTransaction,
+        candidateLead: candidateLead(),
+        paymentTransaction: transaction,
         cvAnalysis: analysis,
         createdAt: new Date().toISOString(),
-        originalApplicationUrl: opportunity.sourceProvenance.applicationDestination,
+        originalApplicationUrl:
+          opportunity.sourceProvenance.applicationDestination ||
+          opportunity.sourceProvenance.originalUrl,
         status: 'READY',
+        opportunitySnapshot: opportunity,
+        jobRequirementsSnapshot: jobRequirements,
+        matchAnalysisSnapshot: matchAnalysis,
+        readinessAnalysisSnapshot: readinessAnalysis,
+        candidateConfirmationsSnapshot: candidateConfirmations || {},
       };
 
+      setCvAnalysis(analysis);
       setCreatedPackage(pkg);
       onCompletePackage(pkg);
       setIsGenerating(false);
-      setStep(5);
-    } catch (err: any) {
+    } catch (error: any) {
+      setGenerationError(error?.message || 'We could not prepare your application.');
       setIsGenerating(false);
-      setGenerationError(err.message || 'An error occurred while building your package.');
     }
   };
 
-  // Step 5 Copy Helpers
-  const copyToClipboard = (text: string, type: 'cv' | 'cover') => {
-    navigator.clipboard.writeText(text);
-    if (type === 'cv') {
-      setCopiedCv(true);
-      setTimeout(() => setCopiedCv(false), 2500);
-    } else {
-      setCopiedCoverLetter(true);
-      setTimeout(() => setCopiedCoverLetter(false), 2500);
+  const handlePaymentSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setPaymentError('');
+
+    if (paymentMethod === 'JOBL_VOUCHER' && !voucherCode.trim()) {
+      setPaymentError('Enter your voucher code.');
+      return;
+    }
+
+    setIsProcessingPayment(true);
+    try {
+      const response = await fetch('/api/payment/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          opportunityId: opportunity.id,
+          candidateEmail: email.trim(),
+          provider: paymentMethod,
+          voucherCode: paymentMethod === 'JOBL_VOUCHER' ? voucherCode.trim() : undefined,
+        }),
+      });
+
+      const data = await response.json();
+      if (!data.success) throw new Error(data.error || 'Payment could not be completed.');
+
+      const transaction: PaymentTransaction = data.transaction;
+      setPaymentTransaction(transaction);
+      setIsProcessingPayment(false);
+      await generateApplication(transaction);
+    } catch (error: any) {
+      setPaymentError(error?.message || 'Payment could not be completed.');
+      setIsProcessingPayment(false);
     }
   };
 
-  const handleExternalHandoff = () => {
-    // Log Analytics event
+  const writeClipboard = async (text: string) => {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    const copied = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    if (!copied) throw new Error('Copy is not available in this browser.');
+  };
+
+  const copyText = async (text: string, type: 'cv' | 'cover') => {
+    try {
+      await writeClipboard(text);
+      if (type === 'cv') {
+        setCopiedCv(true);
+        setTimeout(() => setCopiedCv(false), 2000);
+      } else {
+        setCopiedCoverLetter(true);
+        setTimeout(() => setCopiedCoverLetter(false), 2000);
+      }
+    } catch (error: any) {
+      setGenerationError(error?.message || 'Could not copy that text.');
+    }
+  };
+
+  const handleDocumentsReady = (documents: GeneratedApplicationDocuments) => {
+    if (!createdPackage) return;
+    const updatedPackage: ApplicationPackageWithDocuments = {
+      ...createdPackage,
+      generatedDocuments: {
+        cv: documents.cv,
+        coverLetter: documents.coverLetter,
+      },
+    };
+    setCreatedPackage(updatedPackage);
+    onCompletePackage(updatedPackage);
+  };
+
+  const handleExternalHandoff = async () => {
     fetch('/api/analytics/event', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -293,310 +415,289 @@ export const ApplicationReadinessFlow: React.FC<ApplicationReadinessFlowProps> =
         metadata: {
           opportunityId: opportunity.id,
           employer: opportunity.employer,
-          candidateEmail: email,
+          candidateEmail: email.trim(),
         },
       }),
     });
 
-    window.open(opportunity.sourceProvenance.applicationDestination, '_blank', 'noopener,noreferrer');
+    const provenance = opportunity.sourceProvenance;
+    setHandoffMessage('');
+
+    if (provenance.applicationMethodType === 'EMAIL' && provenance.applicationEmail) {
+      window.location.href = `mailto:${provenance.applicationEmail}?subject=${encodeURIComponent(
+        `Application for ${opportunity.title}`
+      )}`;
+      return;
+    }
+
+    const destination = provenance.applicationDestination || provenance.originalUrl;
+    if (destination) {
+      window.open(destination, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    if (provenance.applicationInstructions) {
+      try {
+        await writeClipboard(provenance.applicationInstructions);
+        setHandoffMessage('Application instructions copied.');
+      } catch {
+        setHandoffMessage('Use the application instructions shown above.');
+      }
+    }
   };
 
-  const steps = [
-    { n: 1, label: 'Details' },
-    { n: 2, label: 'Payment' },
-    { n: 3, label: 'CV' },
-    { n: 4, label: 'Package' },
-  ];
-  const activeStepIndex = step === 5 ? 3 : step - 1;
+  const hasExternalDestination = Boolean(
+    opportunity.sourceProvenance.applicationDestination || opportunity.sourceProvenance.originalUrl
+  );
+  const applyLabel =
+    opportunity.sourceProvenance.applicationMethodType === 'EMAIL' && opportunity.sourceProvenance.applicationEmail
+      ? 'Open email to apply'
+      : hasExternalDestination && opportunity.sourceProvenance.destinationStatus === 'VERIFIED'
+      ? `Apply at ${opportunity.employer}`
+      : hasExternalDestination
+      ? 'Open official application page'
+      : 'Copy application instructions';
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} aria-hidden />
-      <div className="relative bg-white w-full sm:max-w-xl sm:rounded-2xl shadow-2xl border border-slate-200/80 overflow-hidden my-0 sm:my-6 flex flex-col max-h-[94vh] sm:max-h-[90vh] rounded-t-2xl sm:rounded-2xl">
-        {/* Header */}
-        <div className="shrink-0 px-5 sm:px-6 pt-5 pb-4 border-b border-slate-100">
-          <div className="flex items-start justify-between gap-3">
+      <div className="absolute inset-0 bg-slate-950/55 backdrop-blur-sm" onClick={onClose} aria-hidden />
+
+      <div className="relative bg-white w-full sm:max-w-xl sm:rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden flex flex-col max-h-[96vh] sm:max-h-[92vh] rounded-t-3xl">
+        <header className="shrink-0 px-5 sm:px-6 pt-5 pb-4 border-b border-slate-100">
+          <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-xs font-medium text-slate-500 mb-1">Application readiness</p>
-              <h2 className="text-base sm:text-lg font-semibold text-slate-900 tracking-tight leading-snug truncate">
-                {opportunity.title}
-              </h2>
+              <p className="text-xs font-semibold text-blue-700 mb-1">Get ready to apply</p>
+              <h2 className="text-lg font-bold text-slate-950 truncate">{opportunity.title}</h2>
               <p className="text-sm text-slate-500 mt-0.5 truncate">{opportunity.employer}</p>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="shrink-0 p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-              aria-label="Close"
+              className="shrink-0 p-2.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              aria-label="Close application"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Stepper */}
-          <div className="mt-5 flex items-center gap-2">
-            {steps.map((s, i) => {
-              const done = i < activeStepIndex;
-              const current = i === activeStepIndex;
+          <div className="mt-5 grid grid-cols-3 gap-2">
+            {stages.map((item, index) => {
+              const done = index < activeStageIndex;
+              const current = index === activeStageIndex;
               return (
-                <div key={s.n} className="flex items-center gap-2 flex-1 min-w-0">
-                  <div
-                    className={`
-                      w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0
-                      ${current ? 'bg-slate-900 text-white' : done ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}
-                    `}
-                  >
-                    {done ? '✓' : s.n}
-                  </div>
-                  <span className={`text-xs font-medium truncate hidden sm:inline ${current ? 'text-slate-900' : 'text-slate-400'}`}>
-                    {s.label}
-                  </span>
-                  {i < steps.length - 1 && (
-                    <div className={`flex-1 h-px ${done ? 'bg-emerald-300' : 'bg-slate-200'}`} />
-                  )}
+                <div key={item.id} className="min-w-0">
+                  <div className={`h-1.5 rounded-full ${done || current ? 'bg-slate-950' : 'bg-slate-100'}`} />
+                  <p className={`mt-2 text-xs font-semibold ${current ? 'text-slate-950' : done ? 'text-slate-600' : 'text-slate-400'}`}>
+                    {done ? '✓ ' : ''}{item.label}
+                  </p>
                 </div>
               );
             })}
           </div>
-        </div>
+        </header>
 
-        {/* STEP 1: CANDIDATE LEAD CAPTURE */}
-        {step === 1 && (
-          <form onSubmit={handleLeadSubmit} className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1 text-slate-800">
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-700">
-              <p className="font-medium flex items-center gap-1.5 text-slate-900">
-                <ShieldCheck className="w-4 h-4 text-slate-500" />
-                Candidate Contact Details
-              </p>
-              <p className="mt-1 text-blue-800">
-                Provide your contact details so JobL can personalize your application package and cover letter for {opportunity.employer}.
+        {stage === 'cv' && (
+          <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-5">
+            <div>
+              <h3 className="text-2xl font-bold text-slate-950 tracking-[-0.035em]">Your CV</h3>
+              <p className="text-sm text-slate-500 mt-1.5">
+                We’ll use it to tailor this application to the job.
               </p>
             </div>
 
-            {leadError && (
-              <div className="bg-red-50 border border-red-200 text-red-800 p-3 rounded-xl text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-                <span>{leadError}</span>
+            {candidateProfile ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-emerald-700 text-sm font-semibold">
+                    <CheckCircle2 className="w-4 h-4" />
+                    CV ready
+                  </div>
+                  <p className="text-sm font-semibold text-slate-950 mt-2 truncate">
+                    {[candidateProfile.firstName, candidateProfile.surname].filter(Boolean).join(' ') || 'Saved CV'}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {candidateProfile.employmentHistory?.length || 0} work roles · {candidateProfile.skills?.length || 0} skills
+                  </p>
+                </div>
+                <label
+                  htmlFor="jobl-flow-cv"
+                  className="text-xs font-semibold text-slate-600 hover:text-slate-950 cursor-pointer shrink-0"
+                >
+                  Replace
+                </label>
+              </div>
+            ) : (
+              <label
+                htmlFor="jobl-flow-cv"
+                className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center block cursor-pointer hover:border-slate-400 transition-colors"
+              >
+                <Upload className="w-6 h-6 text-slate-500 mx-auto" />
+                <p className="text-sm font-semibold text-slate-950 mt-3">Add your CV</p>
+                <p className="text-xs text-slate-500 mt-1">PDF, DOC, DOCX, TXT or RTF · up to 10MB</p>
+              </label>
+            )}
+
+            <input
+              id="jobl-flow-cv"
+              type="file"
+              accept=".pdf,.doc,.docx,.txt,.rtf,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+              onChange={handleCvUpload}
+              className="hidden"
+            />
+
+            {isExtractingCv && (
+              <div className="rounded-xl bg-blue-50 border border-blue-100 p-3.5 flex items-center gap-2.5 text-sm text-blue-900">
+                <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
+                Reading your CV…
+              </div>
+            )}
+            {cvError && (
+              <div className="rounded-xl bg-red-50 border border-red-100 p-3.5 flex items-start gap-2.5 text-sm text-red-800">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                {cvError}
               </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {!candidateProfile && (
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1.5">First Name *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Thabo"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300"
-                />
+                <button
+                  type="button"
+                  onClick={() => setShowExperienceFallback((value) => !value)}
+                  className="text-sm font-semibold text-blue-700 hover:text-blue-800 cursor-pointer"
+                >
+                  {showExperienceFallback ? 'Hide experience box' : 'No CV? Add your experience instead'}
+                </button>
+                {showExperienceFallback && (
+                  <textarea
+                    rows={5}
+                    value={cvText}
+                    onChange={(event) => setCvText(event.target.value)}
+                    placeholder="Tell us about your education, previous jobs and skills."
+                    className="mt-3 w-full rounded-xl border border-slate-200 bg-white p-3.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                  />
+                )}
               </div>
+            )}
 
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1.5">Surname *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Mokoena"
-                  value={surname}
-                  onChange={(e) => setSurname(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300"
-                />
+            <div className="pt-1 border-t border-slate-100">
+              <p className="text-sm font-bold text-slate-950 mt-5">Check your contact details</p>
+              <p className="text-xs text-slate-500 mt-1">These go on your application.</p>
+            </div>
+
+            {detailsError && (
+              <div className="rounded-xl bg-red-50 border border-red-100 p-3.5 flex items-start gap-2.5 text-sm text-red-800">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                {detailsError}
               </div>
+            )}
 
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1.5">Mobile Phone (SA) *</label>
-                <input
-                  type="tel"
-                  required
-                  placeholder="e.g. 082 123 4567"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300"
-                />
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input value={firstName} onChange={(event) => setFirstName(event.target.value)} placeholder="First name" className="rounded-xl border border-slate-200 px-3.5 py-3 text-sm" />
+              <input value={surname} onChange={(event) => setSurname(event.target.value)} placeholder="Surname" className="rounded-xl border border-slate-200 px-3.5 py-3 text-sm" />
+              <input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="Mobile number" className="rounded-xl border border-slate-200 px-3.5 py-3 text-sm" />
+              <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email address" className="rounded-xl border border-slate-200 px-3.5 py-3 text-sm" />
+              <input value={locationCity} onChange={(event) => setLocationCity(event.target.value)} placeholder="Where you live" className="sm:col-span-2 rounded-xl border border-slate-200 px-3.5 py-3 text-sm" />
+            </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1.5">Email Address *</label>
-                <input
-                  type="email"
-                  required
-                  placeholder="e.g. thabo@example.co.za"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300"
-                />
+            <label className="flex items-start gap-3 rounded-xl bg-slate-50 border border-slate-200 p-3.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={popiaAgreed}
+                onChange={(event) => setPopiaAgreed(event.target.checked)}
+                className="mt-0.5 w-4 h-4"
+              />
+              <span className="text-xs text-slate-600 leading-relaxed">
+                I agree to JobL using these details to prepare this application and guide me to the employer’s official application page.
+              </span>
+            </label>
+
+            <button
+              type="button"
+              onClick={continueToPayment}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors cursor-pointer"
+            >
+              Continue — R5
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {stage === 'payment' && (
+          <form onSubmit={handlePaymentSubmit} className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-5">
+            <div className="rounded-2xl bg-slate-950 text-white p-5">
+              <p className="text-sm text-slate-300">Get this application ready</p>
+              <div className="flex items-end justify-between gap-4 mt-2">
+                <p className="text-4xl font-bold tracking-[-0.04em]">R5</p>
+                <p className="text-xs text-slate-400 text-right">once for this job</p>
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1.5">Your Current Location</label>
-              <input
-                type="text"
-                value={locationCity}
-                onChange={(e) => setLocationCity(e.target.value)}
-                placeholder="e.g. Soweto, Johannesburg"
-                className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300"
-              />
-            </div>
+              <h3 className="text-lg font-bold text-slate-950">How would you like to pay?</h3>
+              <div className="mt-3 space-y-2.5">
+                <label className={`flex items-center gap-3 rounded-xl border p-4 cursor-pointer ${paymentMethod === 'PEACH_PAYMENTS' ? 'border-slate-950 bg-slate-50' : 'border-slate-200'}`}>
+                  <input type="radio" name="payment" checked={paymentMethod === 'PEACH_PAYMENTS'} onChange={() => setPaymentMethod('PEACH_PAYMENTS')} />
+                  <CreditCard className="w-5 h-5 text-slate-500" />
+                  <div>
+                    <p className="text-sm font-semibold text-slate-950">Card or bank</p>
+                    <p className="text-xs text-slate-500">Secure South African checkout</p>
+                  </div>
+                </label>
 
-            {/* POPIA Consent Checkbox */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
-              <label className="flex items-start space-x-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={popiaAgreed}
-                  onChange={(e) => setPopiaAgreed(e.target.checked)}
-                  className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
-                />
-                <span className="text-xs text-slate-700 leading-snug">
-                  <strong>POPIA Consent:</strong> I agree to JobL processing my contact details and profile solely for the purpose of generating my tailored application package and referring me to the employer's official portal.
-                </span>
-              </label>
-            </div>
+                <label className={`flex items-center gap-3 rounded-xl border p-4 cursor-pointer ${paymentMethod === 'OZOW_EFT' ? 'border-slate-950 bg-slate-50' : 'border-slate-200'}`}>
+                  <input type="radio" name="payment" checked={paymentMethod === 'OZOW_EFT'} onChange={() => setPaymentMethod('OZOW_EFT')} />
+                  <Lock className="w-5 h-5 text-slate-500" />
+                  <div>
+                    <p className="text-sm font-semibold text-slate-950">Instant EFT</p>
+                    <p className="text-xs text-slate-500">Pay directly from your bank</p>
+                  </div>
+                </label>
 
-            <div className="pt-2">
-              <button
-                type="submit"
-                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-3.5 rounded-xl text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <span>Proceed to R5 Payment Gate</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* STEP 2: R5 PAYMENT GATEWAY */}
-        {step === 2 && (
-          <form onSubmit={handlePaymentSubmit} className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1 text-slate-800">
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Readiness fee</p>
-                <p className="text-2xl font-semibold text-slate-900 mt-0.5">R5 <span className="text-sm font-normal text-slate-400">ZAR</span></p>
+                <label className={`block rounded-xl border p-4 cursor-pointer ${paymentMethod === 'JOBL_VOUCHER' ? 'border-slate-950 bg-slate-50' : 'border-slate-200'}`}>
+                  <div className="flex items-center gap-3">
+                    <input type="radio" name="payment" checked={paymentMethod === 'JOBL_VOUCHER'} onChange={() => setPaymentMethod('JOBL_VOUCHER')} />
+                    <ShieldCheck className="w-5 h-5 text-slate-500" />
+                    <div>
+                      <p className="text-sm font-semibold text-slate-950">I have a JobL voucher</p>
+                      <p className="text-xs text-slate-500">Enter your code below</p>
+                    </div>
+                  </div>
+                  {paymentMethod === 'JOBL_VOUCHER' && (
+                    <input
+                      value={voucherCode}
+                      onChange={(event) => setVoucherCode(event.target.value)}
+                      placeholder="Voucher code"
+                      className="mt-3 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                    />
+                  )}
+                </label>
               </div>
-              <span className="text-xs font-medium text-slate-600 bg-white border border-slate-200 px-2.5 py-1 rounded-lg">
-                Per vacancy
-              </span>
             </div>
 
             {paymentError && (
-              <div className="bg-red-50 border border-red-200 text-red-800 p-3 rounded-xl text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-                <span>{paymentError}</span>
+              <div className="rounded-xl bg-red-50 border border-red-100 p-3.5 flex items-start gap-2.5 text-sm text-red-800">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                {paymentError}
               </div>
             )}
 
-            <div className="space-y-3">
-              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">Select Payment Rail</label>
-
-              {/* Voucher Redemption Option */}
-              <label className={`block border p-3.5 rounded-xl cursor-pointer transition-all ${
-                paymentMethod === 'JOBL_VOUCHER' ? 'border-amber-500 bg-amber-50/50 ring-2 ring-amber-500/20' : 'border-slate-200 hover:bg-slate-50'
-              }`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2.5">
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      checked={paymentMethod === 'JOBL_VOUCHER'}
-                      onChange={() => setPaymentMethod('JOBL_VOUCHER')}
-                      className="text-amber-500 focus:ring-amber-500"
-                    />
-                    <div>
-                      <p className="text-xs font-bold text-slate-900">JobL Community Voucher Code</p>
-                      <p className="text-[11px] text-slate-500">Free candidate access code for testing/community access</p>
-                    </div>
-                  </div>
-                  <span className="bg-amber-100 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded">
-                    Free / Access
-                  </span>
-                </div>
-
-                {paymentMethod === 'JOBL_VOUCHER' && (
-                  <div className="mt-3 pt-3 border-t border-amber-200/80">
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Enter Code:</label>
-                    <input
-                      type="text"
-                      value={voucherCode}
-                      onChange={(e) => setVoucherCode(e.target.value)}
-                      placeholder="e.g. JOBL-R5-FREE-2026"
-                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                    />
-                    <p className="text-[10px] text-slate-500 mt-1">
-                      Pre-filled code <strong>JOBL-R5-FREE-2026</strong> is active for community evaluation.
-                    </p>
-                  </div>
-                )}
-              </label>
-
-              {/* Peach Payments Option */}
-              <label className={`block border p-3.5 rounded-xl cursor-pointer transition-all ${
-                paymentMethod === 'PEACH_PAYMENTS' ? 'border-amber-500 bg-amber-50/50 ring-2 ring-amber-500/20' : 'border-slate-200 hover:bg-slate-50'
-              }`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2.5">
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      checked={paymentMethod === 'PEACH_PAYMENTS'}
-                      onChange={() => setPaymentMethod('PEACH_PAYMENTS')}
-                      className="text-amber-500 focus:ring-amber-500"
-                    />
-                    <div>
-                      <p className="text-xs font-bold text-slate-900">Peach Payments (SA Card / Capitec Pay / EFT)</p>
-                      <p className="text-[11px] text-slate-500">Secure R5.00 South African card or bank checkout</p>
-                    </div>
-                  </div>
-                  <CreditCard className="w-4 h-4 text-slate-400" />
-                </div>
-              </label>
-
-              {/* Ozow EFT Option */}
-              <label className={`block border p-3.5 rounded-xl cursor-pointer transition-all ${
-                paymentMethod === 'OZOW_EFT' ? 'border-amber-500 bg-amber-50/50 ring-2 ring-amber-500/20' : 'border-slate-200 hover:bg-slate-50'
-              }`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2.5">
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      checked={paymentMethod === 'OZOW_EFT'}
-                      onChange={() => setPaymentMethod('OZOW_EFT')}
-                      className="text-amber-500 focus:ring-amber-500"
-                    />
-                    <div>
-                      <p className="text-xs font-bold text-slate-900">Ozow Instant EFT</p>
-                      <p className="text-[11px] text-slate-500">Instant bank transfer for Capitec, FNB, Absa, Standard Bank, Nedbank</p>
-                    </div>
-                  </div>
-                  <Lock className="w-4 h-4 text-slate-400" />
-                </div>
-              </label>
-            </div>
-
-            <div className="pt-2 flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 cursor-pointer"
-              >
+            <div className="flex gap-3 pt-1">
+              <button type="button" onClick={() => setStage('cv')} className="px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer">
                 Back
               </button>
               <button
                 type="submit"
                 disabled={isProcessingPayment}
-                className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3 rounded-xl text-sm transition-all shadow-md flex items-center justify-center space-x-2 disabled:opacity-50 cursor-pointer"
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
               >
                 {isProcessingPayment ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Verifying Payment...</span>
+                    Completing payment…
                   </>
                 ) : (
                   <>
-                    <span>Confirm R5 Payment / Voucher</span>
+                    Pay R5 and prepare my application
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
@@ -605,249 +706,117 @@ export const ApplicationReadinessFlow: React.FC<ApplicationReadinessFlowProps> =
           </form>
         )}
 
-        {/* STEP 3: CANDIDATE EXPERIENCE & CV BUILDER */}
-        {step === 3 && (
-          <div className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1 text-slate-800">
-            <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl p-3.5 text-xs flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <div>
-                  <p className="font-bold">Payment Verified Server-Side</p>
-                  <p className="text-[11px] text-emerald-800">Ref: {paymentTransaction?.reference}</p>
-                </div>
+        {stage === 'ready' && (
+          <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-5">
+            {isGenerating ? (
+              <div className="py-14 text-center">
+                <div className="w-11 h-11 rounded-full border-2 border-slate-200 border-t-slate-950 animate-spin mx-auto" />
+                <h3 className="text-xl font-bold text-slate-950 mt-5">Getting everything ready</h3>
+                <p className="text-sm text-slate-500 mt-2 max-w-sm mx-auto leading-relaxed">
+                  JobL is tailoring your CV and cover letter for {opportunity.title}.
+                </p>
               </div>
-              <span className="bg-emerald-200 text-emerald-900 text-[10px] font-bold px-2 py-0.5 rounded">
-                Verified
-              </span>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                <div>
-                  <label className="block text-xs font-bold text-slate-800">
-                    Provide Your Existing CV Document or Experience
-                  </label>
-                  <p className="text-xs text-slate-500">
-                    Upload your CV file (PDF, DOC, DOCX, TXT) or paste your experience below.
+            ) : generationError ? (
+              <div className="py-10 text-center">
+                <AlertCircle className="w-9 h-9 text-red-500 mx-auto" />
+                <h3 className="text-lg font-bold text-slate-950 mt-4">We couldn’t finish your application</h3>
+                <p className="text-sm text-slate-500 mt-2">{generationError}</p>
+                {paymentTransaction && (
+                  <button
+                    type="button"
+                    onClick={() => generateApplication(paymentTransaction)}
+                    className="mt-5 rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white cursor-pointer"
+                  >
+                    Try again
+                  </button>
+                )}
+              </div>
+            ) : cvAnalysis && createdPackage ? (
+              <>
+                <div className="rounded-3xl bg-emerald-50 border border-emerald-100 p-5 sm:p-6 text-center">
+                  <div className="w-12 h-12 rounded-full bg-emerald-600 text-white flex items-center justify-center mx-auto">
+                    <Check className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-950 tracking-[-0.035em] mt-4">Your application is ready</h3>
+                  <p className="text-sm text-slate-600 mt-2">
+                    Your CV and cover letter have been tailored for {opportunity.employer}.
                   </p>
                 </div>
 
-                <label
-                  htmlFor="flow-mobile-cv-input"
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all cursor-pointer flex items-center space-x-1.5 shadow-sm"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>UPLOAD MY CV</span>
-                </label>
-                <input
-                  id="flow-mobile-cv-input"
-                  type="file"
-                  accept=".pdf,.doc,.docx,.txt,.rtf,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
-                  onChange={handleStep3FileUpload}
-                  className="hidden"
-                />
-              </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="rounded-2xl border border-slate-200 p-4 bg-white">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-blue-700" />
+                      <p className="text-sm font-bold text-slate-950">Your tailored CV</p>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-2">Adjusted to highlight what matters for this role.</p>
+                    <button
+                      type="button"
+                      onClick={() => void copyText(cvAnalysis.tailoredCVText, 'cv')}
+                      className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 cursor-pointer"
+                    >
+                      {copiedCv ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copiedCv ? 'Copied' : 'Copy CV text'}
+                    </button>
+                  </div>
 
-              {isExtractingCv && (
-                <div className="bg-blue-50 border border-blue-200 text-blue-900 p-3 rounded-xl text-xs flex items-center gap-2">
-                  <RefreshCw className="w-4 h-4 text-blue-600 animate-spin shrink-0" />
-                  <span>Server extracting structured CV details from your document...</span>
+                  <div className="rounded-2xl border border-slate-200 p-4 bg-white">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-blue-700" />
+                      <p className="text-sm font-bold text-slate-950">Your cover letter</p>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-2">Written for this job using your real experience.</p>
+                    <button
+                      type="button"
+                      onClick={() => void copyText(cvAnalysis.coverLetterMessage, 'cover')}
+                      className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 cursor-pointer"
+                    >
+                      {copiedCoverLetter ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copiedCoverLetter ? 'Copied' : 'Copy cover letter'}
+                    </button>
+                  </div>
                 </div>
-              )}
 
-              {step3UploadError && (
-                <div className="bg-red-50 border border-red-200 text-red-800 p-3 rounded-xl text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-                  <span>{step3UploadError}</span>
-                </div>
-              )}
+                {candidateProfile && (
+                  <ApplicationDocuments
+                    candidateProfile={candidateProfile}
+                    opportunity={opportunity}
+                    jobRequirements={jobRequirements}
+                    matchAnalysis={matchAnalysis}
+                    readinessAnalysis={readinessAnalysis}
+                    candidateConfirmations={candidateConfirmations}
+                    autoGenerate
+                    onDocumentsReady={handleDocumentsReady}
+                  />
+                )}
 
-              <textarea
-                rows={6}
-                value={cvText}
-                onChange={(e) => setCvText(e.target.value)}
-                placeholder="Example: Grade 12 passed in 2024 with English, Mathematics Literacy, Life Sciences. Worked as a seasonal stock assistant at a local store. Skilled in customer service, punctuality, and basic inventory checks..."
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs sm:text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
-              />
-            </div>
+                {opportunity.sourceProvenance.applicationInstructions && (
+                  <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
+                    <p className="text-sm font-bold text-slate-950">How to apply</p>
+                    <p className="text-sm text-slate-600 mt-2 leading-relaxed whitespace-pre-wrap">
+                      {opportunity.sourceProvenance.applicationInstructions}
+                    </p>
+                  </div>
+                )}
 
-            <div className="pt-2 flex items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => setStep(2)}
-                className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 cursor-pointer"
-              >
-                Back
-              </button>
-              <button
-                type="button"
-                onClick={handleGeneratePackage}
-                className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-semibold py-3.5 rounded-xl text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Sparkles className="w-4 h-4" />
-                <span>Build Job-Specific Application Package</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 4: AI GENERATING PROGRESS */}
-        {step === 4 && (
-          <div className="p-8 text-center space-y-4 overflow-y-auto flex-1 flex flex-col items-center justify-center">
-            {isGenerating ? (
-              <>
-                <div className="w-10 h-10 border-2 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
-                <h3 className="text-base font-semibold text-slate-900">Building your package…</h3>
-                <p className="text-sm text-slate-500 max-w-sm leading-relaxed">
-                  Matching your profile to <strong className="text-slate-700">{opportunity.title}</strong> at {opportunity.employer}. Tailored CV, cover letter, and prep tips.
-                </p>
-              </>
-            ) : generationError ? (
-              <div className="space-y-3">
-                <AlertCircle className="w-8 h-8 text-red-500 mx-auto" />
-                <h3 className="text-base font-semibold text-red-800">Something went wrong</h3>
-                <p className="text-sm text-slate-600">{generationError}</p>
                 <button
                   type="button"
-                  onClick={handleGeneratePackage}
-                  className="bg-slate-900 text-white text-sm font-medium px-5 py-2.5 rounded-xl cursor-pointer"
+                  onClick={() => void handleExternalHandoff()}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-4 text-sm font-semibold text-white hover:bg-blue-700 transition-colors cursor-pointer"
                 >
-                  Try again
+                  {applyLabel}
+                  <ExternalLink className="w-4 h-4" />
                 </button>
-              </div>
+
+                {handoffMessage && (
+                  <p className="text-center text-xs font-medium text-emerald-700">{handoffMessage}</p>
+                )}
+
+                <p className="text-center text-xs text-slate-400">
+                  Saved automatically in My applications.
+                </p>
+              </>
             ) : null}
-          </div>
-        )}
-
-        {/* STEP 5: COMPLETED PACKAGE & HANDOFF */}
-        {step === 5 && cvAnalysis && (
-          <div className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1 text-slate-800">
-            {/* Compatibility Summary Banner */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <p className="text-xs font-medium text-emerald-700 uppercase tracking-wide">Package ready</p>
-                <h3 className="text-base font-semibold text-slate-900 mt-0.5 truncate">{opportunity.title}</h3>
-                <p className="text-sm text-slate-500 mt-0.5 line-clamp-2">{cvAnalysis.candidateSummary}</p>
-              </div>
-              <div className="text-center bg-white border border-slate-200 px-3 py-2 rounded-xl shrink-0">
-                <span className="text-xl font-semibold text-slate-900">{cvAnalysis.overallCompatibilityScore}%</span>
-                <span className="block text-[10px] text-slate-400">Match</span>
-              </div>
-            </div>
-
-            {/* Keyword & Requirements Gap Analysis */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-1">
-                <p className="font-bold text-emerald-950 flex items-center gap-1">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  Matched Requirements
-                </p>
-                <ul className="list-disc list-inside text-emerald-900 space-y-0.5">
-                  {cvAnalysis.jobRequirementAnalysis.matchedRequirements.map((req, i) => (
-                    <li key={i}>{req}</li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1">
-                <p className="font-bold text-amber-950 flex items-center gap-1">
-                  <AlertCircle className="w-4 h-4 text-amber-600" />
-                  Keyword / Skills Focus
-                </p>
-                <ul className="list-disc list-inside text-amber-900 space-y-0.5">
-                  {cvAnalysis.jobRequirementAnalysis.missingKeywords.map((kw, i) => (
-                    <li key={i}>{kw}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-
-            {/* Application Documents Component */}
-            {candidateProfile && (
-              <ApplicationDocuments
-                candidateProfile={candidateProfile}
-                opportunity={opportunity}
-                jobRequirements={jobRequirements}
-                matchAnalysis={matchAnalysis}
-                readinessAnalysis={readinessAnalysis}
-                candidateConfirmations={candidateConfirmations}
-              />
-            )}
-
-            {/* Interview Prep Tips */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2">
-              <p className="text-xs font-bold text-amber-400 uppercase tracking-wider">Role-Specific Interview Prep</p>
-              <ul className="space-y-1 text-xs text-slate-300">
-                {cvAnalysis.interviewPrepTips.map((tip, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="text-amber-400 font-bold">•</span>
-                    <span>{tip}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Final External Handoff & Application Instructions */}
-            <div className="pt-2 bg-amber-50 border border-amber-200 p-4 rounded-xl space-y-3">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-amber-950">
-                  {opportunity.sourceProvenance.destinationStatus === 'VERIFIED'
-                    ? 'Next Step: Apply at Employer Portal'
-                    : opportunity.sourceProvenance.applicationMethodType === 'EMAIL'
-                    ? 'Next Step: Submit Application via Official Email'
-                    : opportunity.sourceProvenance.applicationMethodType === 'POSTAL'
-                    ? 'Next Step: Postal Application Submission'
-                    : opportunity.sourceProvenance.applicationMethodType === 'HAND_DELIVERY'
-                    ? 'Next Step: Hand Delivery Application Submission'
-                    : 'Next Step: Official Application Instructions'}
-                </span>
-                <span className="text-amber-800 font-mono text-[10px] font-bold">
-                  {opportunity.sourceProvenance.destinationStatus === 'VERIFIED' ? 'Verified Destination' : 'Official Vacancy Source'}
-                </span>
-              </div>
-
-              {/* Source-grounded Application Instructions */}
-              {opportunity.sourceProvenance.applicationInstructions && (
-                <div className="bg-amber-100/80 border border-amber-300 rounded-lg p-3 text-xs text-slate-900 space-y-1">
-                  <p className="font-bold text-amber-950">Official Application Instructions ({opportunity.employer}):</p>
-                  <p className="leading-relaxed whitespace-pre-wrap">{opportunity.sourceProvenance.applicationInstructions}</p>
-                </div>
-              )}
-
-              {/* Email Address highlight if email method */}
-              {opportunity.sourceProvenance.applicationEmail && (
-                <div className="bg-white border border-amber-300 rounded-lg p-3 flex items-center justify-between text-xs">
-                  <div>
-                    <span className="text-slate-500 block text-[10px]">Official Submission Email:</span>
-                    <span className="font-mono font-bold text-slate-900">{opportunity.sourceProvenance.applicationEmail}</span>
-                  </div>
-                  <a
-                    href={`mailto:${opportunity.sourceProvenance.applicationEmail}?subject=Application for ${encodeURIComponent(opportunity.title)}`}
-                    className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs transition-colors"
-                  >
-                    Open Email App
-                  </a>
-                </div>
-              )}
-
-              <p className="text-xs text-amber-900">
-                {opportunity.sourceProvenance.destinationStatus === 'VERIFIED'
-                  ? `Your application package is complete! Click below to open ${opportunity.employer}'s official portal and paste your tailored information to submit.`
-                  : `Your application package is complete! Click below to view ${opportunity.employer}'s official vacancy circular and guidelines to finalize your submission.`}
-              </p>
-
-              <button
-                onClick={handleExternalHandoff}
-                className="w-full bg-slate-900 hover:bg-slate-800 text-amber-400 font-bold py-3 px-6 rounded-xl text-sm transition-all shadow-lg flex items-center justify-center space-x-2 cursor-pointer"
-              >
-                <span>
-                  {opportunity.sourceProvenance.destinationStatus === 'VERIFIED'
-                    ? `APPLY NOW AT ${opportunity.employer.toUpperCase()}`
-                    : `VIEW OFFICIAL VACANCY DOCUMENT / INSTRUCTIONS`}
-                </span>
-                <ExternalLink className="w-4 h-4 text-amber-400" />
-              </button>
-            </div>
           </div>
         )}
       </div>
