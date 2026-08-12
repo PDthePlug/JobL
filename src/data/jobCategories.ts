@@ -31,4 +31,3 @@ export const SA_SECTORS = [
   'Private Sector',
   'Youth & Learnership',
 ] as const;
-
